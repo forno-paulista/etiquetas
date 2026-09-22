@@ -1,0 +1,460 @@
+// Schema de dados do Sistema de Rastreabilidade de Produtos/Insumos.
+// Ver CLAUDE.md (raiz do repo) para o contexto de negócio e as regras
+// que este modelo precisa sustentar, em especial a seção 5 (regras de
+// negócio) e a seção 7 (modelo de dados).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Organização / locais
+// ---------------------------------------------------------------------------
+
+model Organizacao {
+  id        String   @id @default(cuid())
+  nome      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  locais Local[]
+}
+
+enum TipoLocal {
+  CD
+  LOJA
+}
+
+model Local {
+  id            String    @id @default(cuid())
+  organizacao   Organizacao @relation(fields: [organizacaoId], references: [id])
+  organizacaoId String
+  nome          String
+  tipo          TipoLocal
+  ativo         Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  saldosLote            SaldoLote[]
+  movimentosOrigem      MovimentoLote[]  @relation("MovimentoLocalOrigem")
+  movimentosDestino     MovimentoLote[]  @relation("MovimentoLocalDestino")
+  transferenciasOrigem  Transferencia[]  @relation("TransferenciaLocalOrigem")
+  transferenciasDestino Transferencia[]  @relation("TransferenciaLocalDestino")
+  producoes             Producao[]
+  descartes             Descarte[]
+  ajustesPendentes      AjustePendente[]
+  integracoes           IntegracaoExterna[]
+  usuarios              UsuarioLocal[]
+  mapeamentosExternos   MapeamentoProdutoExterno[]
+}
+
+// ---------------------------------------------------------------------------
+// Catálogo
+// ---------------------------------------------------------------------------
+
+enum UnidadeMedida {
+  KG
+  G
+  L
+  ML
+  UN
+  CX
+  PCT
+}
+
+// Categoria de produto (ex.: "Frios" > "Laticínios"). Hierarquia de 2
+// níveis por convenção da aplicação (grupo → subgrupo) — não reforçada no
+// banco para não complicar a modelagem por um limite que a UI já garante.
+model Grupo {
+  id         String   @id @default(cuid())
+  nome       String
+  icone      String?
+  grupoPai   Grupo?   @relation("GrupoSubgrupos", fields: [grupoPaiId], references: [id])
+  grupoPaiId String?
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  subgrupos Grupo[]   @relation("GrupoSubgrupos")
+  produtos  Produto[]
+
+  @@index([grupoPaiId])
+}
+
+model Produto {
+  id            String        @id @default(cuid())
+  nome          String
+  unidadeMedida UnidadeMedida
+  grupo         Grupo?        @relation(fields: [grupoId], references: [id])
+  grupoId       String?
+  ativo         Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  lotes               Lote[]
+  producoesSaida       Producao[]
+  mapeamentosExternos  MapeamentoProdutoExterno[]
+
+  @@index([grupoId])
+}
+
+model Fornecedor {
+  id        String   @id @default(cuid())
+  nome      String
+  cnpj      String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lotes Lote[]
+}
+
+// ---------------------------------------------------------------------------
+// Lote / saldo / movimentação (núcleo do sistema)
+// ---------------------------------------------------------------------------
+
+model Lote {
+  id             String    @id @default(cuid())
+  produto        Produto   @relation(fields: [produtoId], references: [id])
+  produtoId      String
+  fornecedor     Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  fornecedorId   String?
+  codigoLote     String
+  dataFabricacao DateTime?
+  dataValidade   DateTime
+  // Chave pública usada na URL do QR Code. Não muda mesmo que a
+  // quantidade do lote varie — a etiqueta impressa é só uma "foto do
+  // momento", a fonte de verdade é sempre consultada por este id.
+  qrCodeId       String    @unique @default(cuid())
+  createdAt      DateTime  @default(now())
+  createdBy      Usuario   @relation("LotesCriados", fields: [createdById], references: [id])
+  createdById    String
+
+  saldos         SaldoLote[]
+  movimentos     MovimentoLote[]
+  transferencias Transferencia[]
+  producaoSaida  Producao?         @relation("ProducaoLoteSaida")
+  consumos       ConsumoProducao[]
+  descartes      Descarte[]
+
+  @@index([produtoId])
+  @@index([dataValidade])
+  @@index([codigoLote])
+}
+
+// Projeção/cache do saldo de um lote em um local — recalculável a partir
+// de MovimentoLote. Não representa o saldo físico exato em tempo real,
+// apenas "quanto ainda não foi formalmente baixado" (ver CLAUDE.md § 9).
+model SaldoLote {
+  id              String   @id @default(cuid())
+  lote            Lote     @relation(fields: [loteId], references: [id])
+  loteId          String
+  local           Local    @relation(fields: [localId], references: [id])
+  localId         String
+  quantidadeAtual Decimal  @db.Decimal(12, 3)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([loteId, localId])
+  @@index([localId])
+}
+
+enum TipoMovimentoLote {
+  ENTRADA
+  TRANSFERENCIA_SAIDA
+  TRANSFERENCIA_ENTRADA
+  DESCARTE
+  PRODUCAO_CONSUMO
+  PRODUCAO_ENTRADA
+  AJUSTE_CONTAGEM
+  // Uso/consumo operacional de um lote na loja (ex.: retirar porcionado
+  // da câmara fria pra usar). Diferente de DESCARTE: não é perda, não
+  // exige motivo nem aciona StockProvider/AjustePendente (CLAUDE.md § 5,
+  // regra 14).
+  CONSUMO
+}
+
+// Append-only: fonte de verdade de toda alteração de quantidade de um
+// lote. Nunca é editado nem apagado (CLAUDE.md § 5, regra 3).
+model MovimentoLote {
+  id             String            @id @default(cuid())
+  lote           Lote              @relation(fields: [loteId], references: [id])
+  loteId         String
+  tipo           TipoMovimentoLote
+  quantidade     Decimal           @db.Decimal(12, 3)
+  localOrigem    Local?            @relation("MovimentoLocalOrigem", fields: [localOrigemId], references: [id])
+  localOrigemId  String?
+  localDestino   Local?            @relation("MovimentoLocalDestino", fields: [localDestinoId], references: [id])
+  localDestinoId String?
+  // Aponta para a Transferencia, Descarte ou Producao que originou o
+  // movimento. Nulo para ENTRADA (o lote em si já é a referência) e
+  // para AJUSTE_CONTAGEM (não tem entidade de origem própria).
+  referenciaId   String?
+  usuario        Usuario           @relation(fields: [usuarioId], references: [id])
+  usuarioId      String
+  timestamp      DateTime          @default(now())
+
+  @@index([loteId])
+  @@index([tipo])
+  @@index([referenciaId])
+}
+
+// ---------------------------------------------------------------------------
+// Transferência
+// ---------------------------------------------------------------------------
+
+enum StatusTransferencia {
+  EM_TRANSITO
+  CONCLUIDA
+  DIVERGENTE
+}
+
+enum NaturezaTransferencia {
+  INTERNA
+  VENDA_INTERCOMPANY
+}
+
+model Transferencia {
+  id                   String                @id @default(cuid())
+  lote                 Lote                  @relation(fields: [loteId], references: [id])
+  loteId               String
+  quantidade           Decimal               @db.Decimal(12, 3)
+  localOrigem          Local                 @relation("TransferenciaLocalOrigem", fields: [localOrigemId], references: [id])
+  localOrigemId        String
+  localDestino         Local                 @relation("TransferenciaLocalDestino", fields: [localDestinoId], references: [id])
+  localDestinoId       String
+  status               StatusTransferencia   @default(EM_TRANSITO)
+  quantidadeConfirmada Decimal?              @db.Decimal(12, 3)
+  natureza             NaturezaTransferencia @default(INTERNA)
+  // Existe no modelo, não é obrigatório nem usado no MVP (CLAUDE.md § 17).
+  referenciaFiscal     String?
+  usuarioEnvio         Usuario               @relation("TransferenciasEnviadas", fields: [usuarioEnvioId], references: [id])
+  usuarioEnvioId       String
+  usuarioRecebimento   Usuario?              @relation("TransferenciasRecebidas", fields: [usuarioRecebimentoId], references: [id])
+  usuarioRecebimentoId String?
+  criadaEm             DateTime              @default(now())
+  confirmadaEm         DateTime?
+
+  @@index([loteId])
+  @@index([status])
+  @@index([localDestinoId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Produção / porcionamento
+// ---------------------------------------------------------------------------
+
+model Producao {
+  id                  String   @id @default(cuid())
+  produtoSaida        Produto  @relation(fields: [produtoSaidaId], references: [id])
+  produtoSaidaId      String
+  loteSaida           Lote     @relation("ProducaoLoteSaida", fields: [loteSaidaId], references: [id])
+  loteSaidaId         String   @unique
+  quantidadeProduzida Decimal  @db.Decimal(12, 3)
+  // Definida manualmente pelo usuário, sem cálculo automático
+  // (CLAUDE.md § 5, regra 10).
+  validadeSaida       DateTime
+  local               Local    @relation(fields: [localId], references: [id])
+  localId             String
+  usuario             Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioId           String
+  data                DateTime @default(now())
+
+  consumos ConsumoProducao[]
+}
+
+// 1:N — suporta múltiplos lotes de matéria-prima por produção desde o
+// início (CLAUDE.md § 5, regra 9).
+model ConsumoProducao {
+  id                  String   @id @default(cuid())
+  producao            Producao @relation(fields: [producaoId], references: [id])
+  producaoId          String
+  loteOrigem          Lote?    @relation(fields: [loteOrigemId], references: [id])
+  loteOrigemId        String?
+  // Se true, loteOrigemId é nulo e descricaoOrigem é obrigatório
+  // (CLAUDE.md § 5, regra 11). Reforçado na camada de aplicação.
+  origemDesconhecida  Boolean  @default(false)
+  descricaoOrigem     String?
+  quantidadeConsumida Decimal  @db.Decimal(12, 3)
+
+  @@index([producaoId])
+  @@index([loteOrigemId])
+}
+
+// ---------------------------------------------------------------------------
+// Descarte
+// ---------------------------------------------------------------------------
+
+model MotivoDescarte {
+  id    String  @id @default(cuid())
+  nome  String  @unique
+  ativo Boolean @default(true)
+
+  descartes Descarte[]
+}
+
+enum StatusAjusteExterno {
+  PENDENTE
+  ENVIADO_FILA
+  AJUSTADO_NO_ERP
+  NAO_APLICAVEL
+}
+
+model Descarte {
+  id                  String              @id @default(cuid())
+  lote                Lote                @relation(fields: [loteId], references: [id])
+  loteId              String
+  quantidade          Decimal             @db.Decimal(12, 3)
+  motivo              MotivoDescarte      @relation(fields: [motivoId], references: [id])
+  motivoId            String
+  local               Local               @relation(fields: [localId], references: [id])
+  localId             String
+  usuario             Usuario             @relation(fields: [usuarioId], references: [id])
+  usuarioId           String
+  data                DateTime            @default(now())
+  statusAjusteExterno StatusAjusteExterno @default(PENDENTE)
+
+  ajustePendente AjustePendente?
+
+  @@index([loteId])
+  @@index([localId])
+}
+
+// Fila específica para lojas/Saipos, já que não há API de escrita lá
+// (CLAUDE.md § 6, fluxo de Descarte, e § 14).
+enum StatusAjustePendente {
+  PENDENTE
+  LANCADO_MANUALMENTE
+}
+
+model AjustePendente {
+  id                 String               @id @default(cuid())
+  descarte           Descarte             @relation(fields: [descarteId], references: [id])
+  descarteId         String               @unique
+  local              Local                @relation(fields: [localId], references: [id])
+  localId            String
+  status             StatusAjustePendente @default(PENDENTE)
+  usuarioQueMarcou   Usuario?             @relation(fields: [usuarioQueMarcouId], references: [id])
+  usuarioQueMarcouId String?
+  data               DateTime?
+
+  @@index([localId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Usuários / permissões
+// ---------------------------------------------------------------------------
+
+enum PapelUsuario {
+  ADMIN
+  GESTOR_CD
+  GESTOR_LOJA
+  OPERADOR
+}
+
+model Usuario {
+  id        String       @id @default(cuid())
+  nome      String
+  email     String       @unique
+  senhaHash String
+  papel     PapelUsuario
+  ativo     Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  locaisAcesso             UsuarioLocal[]
+  lotesCriados             Lote[]           @relation("LotesCriados")
+  movimentos               MovimentoLote[]
+  transferenciasEnviadas   Transferencia[]  @relation("TransferenciasEnviadas")
+  transferenciasRecebidas  Transferencia[]  @relation("TransferenciasRecebidas")
+  producoes                Producao[]
+  descartes                Descarte[]
+  ajustesPendentesMarcados AjustePendente[]
+  auditorias               Auditoria[]
+  refreshTokens            RefreshToken[]
+}
+
+// N:N — um usuário pode ter acesso a 1+ locais (CLAUDE.md § 7).
+model UsuarioLocal {
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  usuarioId String
+  local     Local   @relation(fields: [localId], references: [id])
+  localId   String
+
+  @@id([usuarioId, localId])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
+  usuarioId String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([usuarioId])
+}
+
+// ---------------------------------------------------------------------------
+// Integrações externas (Saipos / Varejo Fácil)
+// ---------------------------------------------------------------------------
+
+enum SistemaExterno {
+  SAIPOS
+  VAREJO_FACIL
+}
+
+// Mapeamento manual produto local ↔ produto no sistema externo. Não há
+// sincronização de catálogo inteiro (CLAUDE.md § 8).
+model MapeamentoProdutoExterno {
+  id            String         @id @default(cuid())
+  produto       Produto        @relation(fields: [produtoId], references: [id])
+  produtoId     String
+  // Nulo quando o mapeamento não é específico de um local (ex.: Varejo
+  // Fácil, que é único por CD).
+  local         Local?         @relation(fields: [localId], references: [id])
+  localId       String?
+  sistema       SistemaExterno
+  codigoExterno String
+
+  @@unique([produtoId, sistema, localId])
+}
+
+model IntegracaoExterna {
+  id           String         @id @default(cuid())
+  tipo         SistemaExterno
+  local        Local          @relation(fields: [localId], references: [id])
+  localId      String
+  // Credenciais/endpoint da integração. Segredos sensíveis devem ficar
+  // fora do banco em produção (variáveis de ambiente/secret manager);
+  // aqui fica só o necessário para o app localizar a config.
+  configuracao Json
+  ativo        Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([tipo, localId])
+}
+
+// ---------------------------------------------------------------------------
+// Auditoria
+// ---------------------------------------------------------------------------
+
+model Auditoria {
+  id            String   @id @default(cuid())
+  usuario       Usuario? @relation(fields: [usuarioId], references: [id])
+  usuarioId     String?
+  acao          String
+  entidade      String
+  entidadeId    String?
+  valoresAntes  Json?
+  valoresDepois Json?
+  timestamp     DateTime @default(now())
+
+  @@index([entidade, entidadeId])
+  @@index([timestamp])
+}
