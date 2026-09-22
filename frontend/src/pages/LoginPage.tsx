@@ -42,7 +42,7 @@ export function LoginPage() {
           autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded-md border border-neutral-300 px-3 py-2 text-base focus:border-neutral-500 focus:outline-none"
+          className="mb-4 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-500 focus:outline-none"
         />
 
         <label className="mb-1 block text-sm font-medium text-neutral-700" htmlFor="senha">
@@ -55,7 +55,7 @@ export function LoginPage() {
           autoComplete="current-password"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
-          className="mb-4 w-full rounded-md border border-neutral-300 px-3 py-2 text-base focus:border-neutral-500 focus:outline-none"
+          className="mb-4 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-500 focus:outline-none"
         />
 
         {erro && <p className="mb-4 text-sm text-red-600">{erro}</p>}

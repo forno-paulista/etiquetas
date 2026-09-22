@@ -1,7 +1,12 @@
 @import 'tailwindcss';
 
 :root {
-  color-scheme: light dark;
+  /* Só claro por enquanto — todas as telas usam classes Tailwind claras
+     (bg-white, bg-neutral-50...) sem variante dark:. "light dark" aqui
+     fazia o navegador aplicar texto claro (herdado pelos inputs) sobre
+     esses fundos brancos forçados quando o SO está no modo escuro —
+     texto branco em fundo branco, invisível. */
+  color-scheme: light;
 }
 
 html,

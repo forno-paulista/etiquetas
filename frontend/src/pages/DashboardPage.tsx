@@ -39,7 +39,7 @@ export function DashboardPage() {
         <select
           value={localId}
           onChange={(e) => setLocalId(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
         >
           <option value="">Todos os locais</option>
           {locais?.map((local) => (
