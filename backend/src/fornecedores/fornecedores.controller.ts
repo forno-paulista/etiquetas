@@ -6,14 +6,15 @@ import { CreateFornecedorDto } from './dto/create-fornecedor.dto.js';
 import { UpdateFornecedorDto } from './dto/update-fornecedor.dto.js';
 import { FornecedoresService } from './fornecedores.service.js';
 
+// Leitura liberada pra qualquer usuário autenticado — ver locais.controller.ts.
 @ApiTags('fornecedores')
 @ApiBearerAuth()
-@Roles(PapelUsuario.ADMIN)
 @Controller('fornecedores')
 export class FornecedoresController {
   constructor(private readonly fornecedoresService: FornecedoresService) {}
 
   @Post()
+  @Roles(PapelUsuario.ADMIN)
   @ApiOperation({ summary: 'Cria um fornecedor' })
   create(@Body() dto: CreateFornecedorDto): Promise<Fornecedor> {
     return this.fornecedoresService.create(dto);
@@ -32,6 +33,7 @@ export class FornecedoresController {
   }
 
   @Patch(':id')
+  @Roles(PapelUsuario.ADMIN)
   @ApiOperation({ summary: 'Atualiza nome, CNPJ ou status de um fornecedor' })
   update(@Param('id') id: string, @Body() dto: UpdateFornecedorDto): Promise<Fornecedor> {
     return this.fornecedoresService.update(id, dto);

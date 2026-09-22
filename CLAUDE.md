@@ -301,6 +301,8 @@ Nenhuma divergência é absorvida silenciosamente.
 | Gestor Loja | Sua loja | Recebimento local, produção, confirmar transferência, descarte, gerenciar fila de ajustes Saipos da própria loja |
 | Operador | Sua loja/CD | Recebimento, descarte, confirmar transferência — sem relatórios/config |
 
+**Leitura de cadastros (produtos, locais, fornecedores, grupos, motivos de descarte) é liberada pra qualquer papel autenticado** — todo mundo precisa consultar essas listas pra preencher os formulários de Recebimento/Descarte/etc. Só criar/editar cadastro continua exclusivo de Admin.
+
 ## 13. QR Code
 
 - Formato: URL curta (`https://.../l/{codigo_curto}`), nunca JSON embutido.

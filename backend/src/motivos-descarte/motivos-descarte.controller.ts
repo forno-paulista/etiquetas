@@ -6,14 +6,15 @@ import { CreateMotivoDescarteDto } from './dto/create-motivo-descarte.dto.js';
 import { UpdateMotivoDescarteDto } from './dto/update-motivo-descarte.dto.js';
 import { MotivosDescarteService } from './motivos-descarte.service.js';
 
+// Leitura liberada pra qualquer usuário autenticado — ver locais.controller.ts.
 @ApiTags('motivos-descarte')
 @ApiBearerAuth()
-@Roles(PapelUsuario.ADMIN)
 @Controller('motivos-descarte')
 export class MotivosDescarteController {
   constructor(private readonly motivosDescarteService: MotivosDescarteService) {}
 
   @Post()
+  @Roles(PapelUsuario.ADMIN)
   @ApiOperation({ summary: 'Cria um motivo de descarte' })
   create(@Body() dto: CreateMotivoDescarteDto): Promise<MotivoDescarte> {
     return this.motivosDescarteService.create(dto);
@@ -32,6 +33,7 @@ export class MotivosDescarteController {
   }
 
   @Patch(':id')
+  @Roles(PapelUsuario.ADMIN)
   @ApiOperation({ summary: 'Atualiza nome ou status de um motivo de descarte' })
   update(@Param('id') id: string, @Body() dto: UpdateMotivoDescarteDto): Promise<MotivoDescarte> {
     return this.motivosDescarteService.update(id, dto);
