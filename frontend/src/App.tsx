@@ -8,6 +8,7 @@ import { ProdutosPage } from './pages/admin/ProdutosPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { LotePage } from './pages/LotePage';
+import { ProducaoPage } from './pages/ProducaoPage';
 import { RecebimentoPage } from './pages/RecebimentoPage';
 import { TransferenciaEnviarPage } from './pages/TransferenciaEnviarPage';
 import { TransferenciaReceberPage } from './pages/TransferenciaReceberPage';
@@ -44,6 +45,16 @@ export function App() {
           <ProtectedRoute>
             <Layout>
               <RecebimentoPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/producao"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ProducaoPage />
             </Layout>
           </ProtectedRoute>
         }
