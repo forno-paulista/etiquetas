@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { LocalAccessGuard } from '../auth/guards/local-access.guard.js';
@@ -22,6 +23,9 @@ export class LotesController {
   }
 
   @Public()
+  // Limite mais apertado que o padrão da API — endpoint público sem auth,
+  // alvo natural de scraping/abuso (CLAUDE.md § 15).
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('qr/:qrCodeId')
   @ApiOperation({ summary: 'Consulta pública de um lote pelo QR Code (sem login, dados básicos só)' })
   consultarPorQrCode(@Param('qrCodeId') qrCodeId: string): Promise<LotePublicoResponseDto> {

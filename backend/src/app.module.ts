@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AjustesPendentesModule } from './ajustes-pendentes/ajustes-pendentes.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -26,6 +27,10 @@ import { UsuariosModule } from './usuarios/usuarios.module.js';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // Limite geral generoso (protege a API como um todo); o endpoint
+    // público de QR (seção 15/13 do CLAUDE.md) usa um limite bem mais
+    // apertado via @Throttle() na própria rota.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
     PrismaModule,
     AuthModule,
     UsuariosModule,
@@ -49,6 +54,7 @@ import { UsuariosModule } from './usuarios/usuarios.module.js';
     // públicos (login, health) precisam marcar @Public() explicitamente.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
