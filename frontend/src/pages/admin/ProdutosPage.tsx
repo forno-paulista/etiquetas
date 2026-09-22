@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { listarGrupos } from '../../lib/api/grupos';
 import {
   atualizarProduto,
@@ -12,13 +13,20 @@ import {
 import { buttonPrimaryClass, buttonSecondaryClass, inputClass, labelClass } from '../../lib/formStyles';
 
 interface FormState {
+  id: string | null;
   nome: string;
   unidadeMedida: UnidadeMedida;
   grupoId: string;
   validadePadraoDias: string;
 }
 
-const FORM_INICIAL: FormState = { nome: '', unidadeMedida: 'UN', grupoId: '', validadePadraoDias: '' };
+const FORM_INICIAL: FormState = {
+  id: null,
+  nome: '',
+  unidadeMedida: 'UN',
+  grupoId: '',
+  validadePadraoDias: '',
+};
 
 export function ProdutosPage() {
   const queryClient = useQueryClient();
@@ -29,15 +37,30 @@ export function ProdutosPage() {
   const { data: produtos, isLoading } = useQuery({ queryKey: ['produtos'], queryFn: listarProdutos });
   const { data: grupos } = useQuery({ queryKey: ['grupos'], queryFn: listarGrupos });
 
-  const criar = useMutation({
-    mutationFn: criarProduto,
+  const salvar = useMutation({
+    mutationFn: (dados: FormState) => {
+      if (dados.id) {
+        return atualizarProduto(dados.id, {
+          nome: dados.nome,
+          unidadeMedida: dados.unidadeMedida,
+          grupoId: dados.grupoId || null,
+          validadePadraoDias: dados.validadePadraoDias ? Number(dados.validadePadraoDias) : null,
+        });
+      }
+      return criarProduto({
+        nome: dados.nome,
+        unidadeMedida: dados.unidadeMedida,
+        grupoId: dados.grupoId || undefined,
+        validadePadraoDias: dados.validadePadraoDias ? Number(dados.validadePadraoDias) : undefined,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['produtos'] });
       setForm(FORM_INICIAL);
       setFormAberto(false);
       setErro(null);
     },
-    onError: () => setErro('Não deu pra criar o produto — confira os dados.'),
+    onError: () => setErro('Não deu pra salvar o produto — confira os dados.'),
   });
 
   const alternarAtivo = useMutation({
@@ -47,19 +70,32 @@ export function ProdutosPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    criar.mutate({
-      nome: form.nome,
-      unidadeMedida: form.unidadeMedida,
-      grupoId: form.grupoId || undefined,
-      validadePadraoDias: form.validadePadraoDias ? Number(form.validadePadraoDias) : undefined,
+    salvar.mutate(form);
+  }
+
+  function editar(produto: Produto) {
+    setForm({
+      id: produto.id,
+      nome: produto.nome,
+      unidadeMedida: produto.unidadeMedida,
+      grupoId: produto.grupoId ?? '',
+      validadePadraoDias: produto.validadePadraoDias ? String(produto.validadePadraoDias) : '',
     });
+    setFormAberto(true);
   }
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-neutral-900">Produtos</h1>
-        <button type="button" className={buttonPrimaryClass} onClick={() => setFormAberto((v) => !v)}>
+        <button
+          type="button"
+          className={buttonPrimaryClass}
+          onClick={() => {
+            setForm(FORM_INICIAL);
+            setFormAberto((v) => !v);
+          }}
+        >
           {formAberto ? 'Cancelar' : 'Novo produto'}
         </button>
       </div>
@@ -109,12 +145,31 @@ export function ProdutosPage() {
                 className={inputClass}
               >
                 <option value="">Sem grupo</option>
-                {grupos?.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.nome}
-                  </option>
-                ))}
+                {grupos
+                  ?.filter((g) => !g.grupoPaiId)
+                  .flatMap((grupoPai) => [
+                    <option key={grupoPai.id} value={grupoPai.id}>
+                      {grupoPai.nome}
+                    </option>,
+                    ...grupos
+                      .filter((g) => g.grupoPaiId === grupoPai.id)
+                      .map((subgrupo) => (
+                        <option key={subgrupo.id} value={subgrupo.id}>
+                          {'  ↳ '}
+                          {subgrupo.nome}
+                        </option>
+                      )),
+                  ])}
               </select>
+              {grupos?.length === 0 && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  Nenhum grupo cadastrado ainda — crie em{' '}
+                  <Link to="/admin/grupos" className="underline">
+                    Administração &gt; Grupos
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
 
             <div>
@@ -135,8 +190,8 @@ export function ProdutosPage() {
 
           {erro && <p className="mb-4 text-sm text-red-600">{erro}</p>}
 
-          <button type="submit" disabled={criar.isPending} className={buttonPrimaryClass}>
-            {criar.isPending ? 'Salvando...' : 'Salvar'}
+          <button type="submit" disabled={salvar.isPending} className={buttonPrimaryClass}>
+            {salvar.isPending ? 'Salvando...' : 'Salvar'}
           </button>
         </form>
       )}
@@ -175,13 +230,18 @@ export function ProdutosPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <button
-                      type="button"
-                      className={buttonSecondaryClass}
-                      onClick={() => alternarAtivo.mutate({ id: produto.id, ativo: !produto.ativo })}
-                    >
-                      {produto.ativo ? 'Desativar' : 'Ativar'}
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button type="button" className={buttonSecondaryClass} onClick={() => editar(produto)}>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className={buttonSecondaryClass}
+                        onClick={() => alternarAtivo.mutate({ id: produto.id, ativo: !produto.ativo })}
+                      >
+                        {produto.ativo ? 'Desativar' : 'Ativar'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -19,6 +19,7 @@ const LINKS: NavLink[] = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/recebimento', label: 'Recebimento' },
   { to: '/admin/produtos', label: 'Produtos', apenasAdmin: true },
+  { to: '/admin/grupos', label: 'Grupos', apenasAdmin: true },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {

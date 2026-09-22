@@ -171,7 +171,7 @@ Fornecedor
 Lote
   ├─ produto_id
   ├─ fornecedor_id (nullable)
-  ├─ codigo_lote
+  ├─ codigo_lote (opcional, texto livre, sem exigência de unicidade — ver § 18.5, item 8)
   ├─ data_fabricacao (nullable)
   ├─ data_validade
   ├─ qr_code_id (chave pública usada no QR — não muda mesmo que a quantidade varie)
@@ -489,6 +489,16 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
    implementação inicial via navegador (`BrowserPrintProvider`). Hardware
    final (impressora térmica própria vs. continuar com a Suflex vs.
    impressora comum) ainda em aberto — seção 17.
+8. **Código do lote** (decisão de 2026-09-22, a partir de dúvida do
+   usuário: "se não tiver, com que cria? gera um genérico?"): confirmado
+   como **texto livre e opcional, sem exigência de unicidade** — segue o
+   precedente real do Suflex (§ 18.4: lá também é campo livre, "quem
+   rastreia de verdade é o QR Code individual da etiqueta, não um código
+   de lote digitado"). Se o usuário não informar, o backend gera um código
+   automático (`AUTO-YYMMDD-XXXX`) só pra a etiqueta não ficar com "Lote "
+   em branco — não é uma tentativa de identificador único, e duas etiquetas
+   podem legitimamente ter o mesmo `codigoLote` sem problema, porque quem
+   identifica o lote de fato é o `qrCodeId`.
 
 ---
 
@@ -498,7 +508,7 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
 - `backend/src/auth/`: autenticação implementada — JWT de acesso curto + refresh token com rotação (tabela `RefreshToken`), senha com argon2, guards globais (`JwtAuthGuard` + `RolesGuard` via `APP_GUARD` — toda rota exige autenticação por padrão, endpoints públicos usam `@Public()`) e `LocalAccessGuard` por rota pra checar acesso por local (seção 12). `prisma/seed.ts` cria o usuário Admin inicial (`npm run db:seed`).
 - `backend/src/usuarios/`: CRUD de usuários (criar, listar, buscar, atualizar papel/status/locais), restrito a `ADMIN` via `@Roles`. É como se cria login pra alguém além do Admin do seed.
 - Cadastros base implementados, todos restritos a `ADMIN`: `backend/src/locais/`, `backend/src/grupos/` (hierarquia de 2 níveis reforçada no service — tentar criar um 3º nível dá 400), `backend/src/fornecedores/`, `backend/src/motivos-descarte/`, `backend/src/produtos/` (com `grupoId` opcional).
-- `backend/src/lotes/`: primeiro módulo de domínio de verdade. `POST /lotes` é o Recebimento (cria Lote + SaldoLote + MovimentoLote ENTRADA numa transação, protegido por `LocalAccessGuard`); `GET /lotes/:id` é a consulta autenticada com histórico completo; `GET /lotes/qr/:qrCodeId` é a consulta resumida via QR, também autenticada (dados básicos só — seção 13, não é mais público).
+- `backend/src/lotes/`: primeiro módulo de domínio de verdade. `POST /lotes` é o Recebimento (cria Lote + SaldoLote + MovimentoLote ENTRADA numa transação, protegido por `LocalAccessGuard`; `codigoLote` é opcional — se omitido, gera um automático via `common/codigo-lote.util.ts`, seção 18.5 item 8; validade padrão, quando não informada, conta a partir da `dataFabricacao` se ela foi preenchida, senão da data de recebimento, regra 10); `GET /lotes/:id` é a consulta autenticada com histórico completo; `GET /lotes/qr/:qrCodeId` é a consulta resumida via QR, também autenticada (dados básicos só — seção 13, não é mais público).
 - `backend/src/producao/`: `POST /producao` consome N lotes de origem (conhecidos e/ou de origem desconhecida — regra 11) e gera um novo `Lote` + `MovimentoLote(PRODUCAO_ENTRADA/PRODUCAO_CONSUMO)`, tudo numa transação. Valida saldo suficiente de cada lote de origem antes de mexer em qualquer coisa.
 - `backend/src/transferencias/`: `POST /transferencias` envia (decrementa saldo na origem na hora, status `EM_TRANSITO`); `PATCH /transferencias/:id/confirmar` recebe (incrementa saldo no destino pela quantidade *confirmada*, não a enviada — vira `CONCLUIDA` ou `DIVERGENTE`, nunca corrigido sozinho, regra 8). `LocalAccessGuard` foi generalizado pra reconhecer `localOrigemId`/`localDestinoId`, não só `localId`.
 - `backend/src/consumo/`: `POST /consumo` registra baixa manual (regra 14) — só `MovimentoLote(CONSUMO)`, não tem tabela própria.
@@ -507,13 +517,13 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
 - `frontend/`: iniciado — Vite + React + TypeScript, Tailwind, React Router, TanStack Query. Capacitor ainda não entrou (só quando for empacotar como app nativo de verdade, seção 15 — a PWA não precisa disso pra existir).
   - `src/lib/apiClient.ts`: instância do axios com refresh automático de token no 401 (fila única de refresh, evita disparar vários em paralelo).
   - `src/context/AuthContext.tsx` + `ProtectedRoute`: sessão guardada no `localStorage` (trade-off consciente — o backend devolve os tokens no corpo, não em cookie httpOnly).
-  - Telas prontas: Login, Dashboard (`/alertas-validade`, filtro por local, cards clicáveis), Produtos (`/admin/produtos`, CRUD simples, só Admin), Recebimento (`/recebimento`, gera o `Lote` + mostra a etiqueta com QR Code renderizado no cliente via lib `qrcode`), Consulta de Lote via QR (`/l/:qrCodeId`, autenticada — é a página pro que o QR code aponta, mas exige login, seção 13). Todas testadas de ponta a ponta no navegador contra o backend real.
+  - Telas prontas: Login, Dashboard (`/alertas-validade`, filtro por local, cards clicáveis), Produtos (`/admin/produtos`, CRUD com edição completa — nome, unidade, grupo, validade padrão —, só Admin, dropdown de grupo mostra subgrupos indentados), Grupos (`/admin/grupos`, CRUD de 2 níveis — grupo e subgrupo —, só Admin), Recebimento (`/recebimento`, gera o `Lote` + mostra a etiqueta com QR Code renderizado no cliente via lib `qrcode`; label de quantidade mostra a unidade de medida do produto selecionado; etiqueta mostra a quantidade recebida), Consulta de Lote via QR (`/l/:qrCodeId`, autenticada — é a página pro que o QR code aponta, mas exige login, seção 13). Todas testadas de ponta a ponta no navegador contra o backend real.
   - `src/lib/formStyles.ts`: classes de formulário centralizadas (o bug do texto invisível em modo escuro veio de inputs sem `bg`/cor de texto explícitos — não repetir isso tela a tela).
   - Achado ao integrar: os 5 endpoints de cadastro (`locais`, `produtos`, `fornecedores`, `grupos`, `motivos-descarte`) estavam com `GET` restrito a `ADMIN` — corrigido pra liberar leitura a qualquer papel autenticado (só escrita continua Admin-only), porque os formulários de qualquer usuário precisam popular esses dropdowns.
 - `docker-compose.yml`: sobe Postgres + backend juntos. É o mesmo compose usado local e em produção (VPS/VM na nuvem) — só muda o `.env`. Ver seção "Deploy" no `README.md`. Frontend ainda não entrou no compose (roda via `npm run dev` direto por enquanto).
 - `prisma migrate deploy` roda automaticamente no boot do container do backend (`Dockerfile`, `CMD`). Válido para uma única réplica; reavaliar se algum dia escalar horizontalmente.
 - **Todos os módulos de domínio do MVP (seção 4) estão implementados no backend e testados de ponta a ponta** (recebimento, produção, transferência, consumo, descarte, contagem). Falta: `StockProvider` (Saipos/Varejo Fácil — precisa de detalhes reais da API, combinado com o usuário), `LabelPrinterProvider`, e o resto das telas do frontend (seção 11).
-- Rate limiting implementado (`@nestjs/throttler`): limite geral de 300 req/min por IP em toda a API, e um limite bem mais apertado (20 req/min) especificamente no `GET /lotes/qr/:qrCodeId` (seção 15) — testado: a 21ª requisição em 1 minuto já recebe 429.
+- Rate limiting implementado (`@nestjs/throttler`): limite geral de 300 req/min por IP em toda a API (seção 15). O limite mais apertado que existia especificamente em `GET /lotes/qr/:qrCodeId` foi removido junto com a decisão de tornar o endpoint autenticado (seção 13) — não fazia mais sentido um limite à parte pra um endpoint que não é mais público.
 - Trabalho a partir daqui é feito na branch `dev` (não em `main`) — PR fica aberto no GitHub até o usuário decidir mergear manualmente.
 
 ## Padrões de documentação

@@ -37,10 +37,15 @@ function QrCodeEtiqueta({ lote }: { lote: Lote }) {
     QRCode.toDataURL(url, { margin: 1, width: 200 }).then(setQrSrc);
   }, [lote.qrCodeId]);
 
+  const quantidadeOriginal = lote.saldos.reduce((soma, saldo) => soma + Number(saldo.quantidadeAtual), 0);
+
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 text-center">
       <div className="mb-2 text-lg font-semibold text-neutral-900">{lote.produto.nome}</div>
       <div className="mb-1 text-sm text-neutral-600">Lote {lote.codigoLote}</div>
+      <div className="mb-1 text-sm text-neutral-600">
+        Quantidade: {quantidadeOriginal} {lote.produto.unidadeMedida}
+      </div>
       <div className="mb-3 text-sm text-neutral-600">
         Validade: {formatarData(lote.dataValidade)}
       </div>
@@ -73,13 +78,15 @@ export function RecebimentoPage() {
     onError: () => setErro('Não deu pra registrar o recebimento — confira os dados (saldo, produto, local).'),
   });
 
+  const produtoSelecionado = produtos?.find((p) => p.id === form.produtoId);
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     receber.mutate({
       produtoId: form.produtoId,
       localId: form.localId,
       fornecedorId: form.fornecedorId || undefined,
-      codigoLote: form.codigoLote,
+      codigoLote: form.codigoLote || undefined,
       quantidade: Number(form.quantidade),
       dataFabricacao: form.dataFabricacao || undefined,
       dataValidade: form.dataValidade || undefined,
@@ -174,20 +181,24 @@ export function RecebimentoPage() {
 
           <div>
             <label className={labelClass} htmlFor="codigoLote">
-              Código do lote
+              Código do lote (opcional)
             </label>
             <input
               id="codigoLote"
-              required
               value={form.codigoLote}
               onChange={(e) => setForm({ ...form, codigoLote: e.target.value })}
               className={inputClass}
+              placeholder="Se deixar em branco, o sistema gera um código"
             />
+            <p className="mt-1 text-xs text-neutral-500">
+              É só texto de referência (ex.: código do fornecedor) — quem identifica o lote de fato é o QR
+              Code, não precisa ser único.
+            </p>
           </div>
 
           <div>
             <label className={labelClass} htmlFor="quantidade">
-              Quantidade
+              Quantidade{produtoSelecionado ? ` (${produtoSelecionado.unidadeMedida})` : ''}
             </label>
             <input
               id="quantidade"

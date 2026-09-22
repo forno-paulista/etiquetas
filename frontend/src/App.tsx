@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
+import { GruposPage } from './pages/admin/GruposPage';
 import { ProdutosPage } from './pages/admin/ProdutosPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
@@ -50,6 +51,16 @@ export function App() {
           <ProtectedRoute papeis={['ADMIN']}>
             <Layout>
               <ProdutosPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/grupos"
+        element={
+          <ProtectedRoute papeis={['ADMIN']}>
+            <Layout>
+              <GruposPage />
             </Layout>
           </ProtectedRoute>
         }

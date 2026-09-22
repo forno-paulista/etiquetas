@@ -5,7 +5,7 @@ export interface CreateLoteInput {
   produtoId: string;
   localId: string;
   fornecedorId?: string;
-  codigoLote: string;
+  codigoLote?: string;
   quantidade: number;
   dataFabricacao?: string;
   dataValidade?: string;

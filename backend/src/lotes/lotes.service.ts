@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Lote, TipoMovimentoLote } from '@prisma/client';
+import { gerarCodigoLotePadrao } from '../common/codigo-lote.util.js';
 import { resolverDataValidade } from '../common/validade.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateLoteDto } from './dto/create-lote.dto.js';
@@ -39,15 +40,23 @@ export class LotesService {
     }
 
     const dataRecebimento = new Date();
-    const dataValidade = resolverDataValidade(dto.dataValidade, dataRecebimento, produto.validadePadraoDias);
+    const dataFabricacao = dto.dataFabricacao ? new Date(dto.dataFabricacao) : undefined;
+    // Regra 10 (CLAUDE.md § 5): a validade padrão conta "a partir da data de
+    // recebimento/fabricação" — se a fabricação foi informada, ela é a base
+    // mais correta (o produto pode ter chegado dias depois de fabricado).
+    const dataValidade = resolverDataValidade(
+      dto.dataValidade,
+      dataFabricacao ?? dataRecebimento,
+      produto.validadePadraoDias,
+    );
 
     const loteId = await this.prisma.$transaction(async (tx) => {
       const lote = await tx.lote.create({
         data: {
           produtoId: dto.produtoId,
           fornecedorId: dto.fornecedorId,
-          codigoLote: dto.codigoLote,
-          dataFabricacao: dto.dataFabricacao ? new Date(dto.dataFabricacao) : undefined,
+          codigoLote: dto.codigoLote?.trim() || gerarCodigoLotePadrao(),
+          dataFabricacao,
           dataValidade,
           createdById: usuarioId,
         },
