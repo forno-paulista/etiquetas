@@ -45,9 +45,12 @@ seed (cria Organização, o Local do CD e um usuário Admin inicial):
 cd backend && npm run db:seed
 ```
 
-O e-mail/senha do Admin saem no log do comando (`SEED_ADMIN_EMAIL` /
-`SEED_ADMIN_SENHA` no `.env` pra customizar) — troque a senha assim que
-acessar pela primeira vez.
+O e-mail/senha do Admin saem no log do comando. Pra customizar, defina
+`SEED_ADMIN_EMAIL` / `SEED_ADMIN_SENHA` especificamente em **`backend/.env`**
+(não no `.env` da raiz, não em `.env.local` — o seed só lê `backend/.env`,
+porque é de dentro de `backend/` que `npm run db:seed` roda). O seed é
+idempotente: rodar de novo com uma senha nova **atualiza** a senha do
+usuário existente (não fica preso na primeira execução).
 
 ### B) Só o Postgres em Docker, backend direto no host (iteração mais rápida)
 
