@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { buscarAlertasValidade, type LoteAlerta } from '../lib/api/alertasValidade';
 import { listarLocais } from '../lib/api/locais';
+import { inputClass } from '../lib/formStyles';
 
 type Bucket = 'vencidos' | 'hoje' | 'amanha' | 'proximos';
 
@@ -39,7 +40,7 @@ export function DashboardPage() {
         <select
           value={localId}
           onChange={(e) => setLocalId(e.target.value)}
-          className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900"
+          className={`${inputClass} w-auto`}
         >
           <option value="">Todos os locais</option>
           {locais?.map((local) => (

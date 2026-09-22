@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { buttonPrimaryClass, inputClass, labelClass } from '../lib/formStyles';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -32,7 +33,7 @@ export function LoginPage() {
       >
         <h1 className="mb-6 text-xl font-semibold text-neutral-900">Entrar</h1>
 
-        <label className="mb-1 block text-sm font-medium text-neutral-700" htmlFor="email">
+        <label className={labelClass} htmlFor="email">
           Email
         </label>
         <input
@@ -42,10 +43,10 @@ export function LoginPage() {
           autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-500 focus:outline-none"
+          className={`mb-4 ${inputClass}`}
         />
 
-        <label className="mb-1 block text-sm font-medium text-neutral-700" htmlFor="senha">
+        <label className={labelClass} htmlFor="senha">
           Senha
         </label>
         <input
@@ -55,16 +56,12 @@ export function LoginPage() {
           autoComplete="current-password"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
-          className="mb-4 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-base text-neutral-900 focus:border-neutral-500 focus:outline-none"
+          className={`mb-4 ${inputClass}`}
         />
 
         {erro && <p className="mb-4 text-sm text-red-600">{erro}</p>}
 
-        <button
-          type="submit"
-          disabled={carregando}
-          className="w-full rounded-md bg-neutral-900 py-2.5 font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
-        >
+        <button type="submit" disabled={carregando} className={`w-full ${buttonPrimaryClass}`}>
           {carregando ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
