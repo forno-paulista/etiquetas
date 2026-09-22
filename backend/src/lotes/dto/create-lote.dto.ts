@@ -30,7 +30,10 @@ export class CreateLoteDto {
   @IsISO8601()
   dataFabricacao?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Se omitida, calculada a partir da validadePadraoDias do produto. Obrigatória se o produto não tiver padrão definido.',
+  })
+  @IsOptional()
   @IsISO8601()
-  dataValidade!: string;
+  dataValidade?: string;
 }

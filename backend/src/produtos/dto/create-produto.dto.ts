@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UnidadeMedida } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsPositive, IsString, MinLength } from 'class-validator';
 
 export class CreateProdutoDto {
   @ApiProperty()
@@ -16,4 +16,10 @@ export class CreateProdutoDto {
   @IsOptional()
   @IsString()
   grupoId?: string;
+
+  @ApiPropertyOptional({ description: 'Validade padrão em dias (ex.: 7) — usada quando o recebimento/produção não informar a validade' })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  validadePadraoDias?: number;
 }

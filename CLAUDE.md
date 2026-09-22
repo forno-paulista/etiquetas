@@ -69,10 +69,10 @@ O QR Code carrega **apenas um identificador** (URL curta apontando para o lote n
 7. Descarte sempre exige: lote, quantidade, motivo, local, usuário responsável — nunca solto sem vínculo a um lote.
 8. Divergências (transferência ou contagem física) **nunca são corrigidas automaticamente** — sempre viram um evento visível para revisão humana.
 9. Produção pode consumir **mais de um lote de origem** (suporte a N:N desde o início, mesmo que hoje normalmente seja 1 lote por produção).
-10. Validade do produto porcionado (saída de uma Produção) é **definida manualmente pelo usuário**, sem cálculo automático — o sistema apenas exibe a validade da matéria-prima como referência.
+10. Validade (de Recebimento ou da saída de uma Produção) é **sempre editável manualmente** — mas se o usuário não informar, o sistema calcula sozinho a partir da `validadePadraoDias` cadastrada no produto (ex.: queijo = 7 dias por padrão), contada a partir da data de recebimento/fabricação. Sem informar e sem padrão cadastrado, o sistema exige o valor (não adivinha do nada). Objetivo: reduzir digitação repetitiva no dia a dia da cozinha, sem tirar a possibilidade de ajuste manual caso a caso.
 11. Consumo de matéria-prima em uma Produção pode ter **origem desconhecida** (ex.: sobra antiga, item que não passou pelo fluxo de recebimento do sistema) — nesse caso, `lote_origem_id` é nulo, mas `origem_desconhecida = true` e uma descrição textual são obrigatórias. Nunca um consumo sem explicação.
 12. A promessa de rastreabilidade do sistema é: **"completa para tudo que entrou pelo fluxo de recebimento do sistema, com gaps explicitamente marcados quando a origem é desconhecida"** — não uma promessa de rastreabilidade absoluta.
-13. **Empacotamento físico (ex.: um "sacão" com N porcionados) não é uma entidade própria no sistema** — é reimpressão da etiqueta/QR do mesmo `Lote`, com a quantidade daquele pacote específico anotada na etiqueta impressa (ex.: "10 un / 700g" no sacão vs. "1 un / 70g" em cada porcionado individual). Consistente com o rastreio agregado por lote (regra 4) — o sistema não precisa saber qual unidade física específica é qual, só a quantidade total do lote.
+13. **Empacotamento físico (ex.: um "sacão" com N porcionados) não é uma entidade própria no sistema** — é reimpressão da etiqueta/QR do mesmo `Lote`, com a quantidade daquele pacote específico anotada na etiqueta impressa (ex.: "10 un / 700g" no sacão vs. "1 un / 70g" em cada porcionado individual). Consistente com o rastreio agregado por lote (regra 4) — o sistema não precisa saber qual unidade física específica é qual, só a quantidade total do lote. **"Produto solto" (item avulso, sem agrupamento) já funciona do mesmo jeito, sem nada especial** — é só um `Lote` com `quantidade` pequena (inclusive 1); nunca existiu uma trava de "precisa ser um grupo/container" no modelo.
 14. Consumo/uso operacional de um lote na loja (ex.: retirar um porcionado da câmara fria pra usar) gera `MovimentoLote` tipo `CONSUMO` — mesma mecânica de tela do `Descarte` (buscar/escanear lote, informar quantidade, registrar), mas **não é perda**: não exige motivo, não aciona `VarejoFacilStockProvider` nem `AjustePendente`. **Não precisa ser lançado no momento exato do uso** — o registro guarda só lote + quantidade + quem lançou + quando foi *registrado* (não quando foi fisicamente usado), então o lançamento pode ser em lote no fim do turno/dia, sem parar a operação pra escanear cada unidade retirada. Existe separado da baixa automática de venda do Saipos (que já não é rastreada por lote, ver seção 9) — é um registro manual complementar, não uma tentativa de sincronizar com o Saipos.
 
 ## 6. Fluxos principais
@@ -114,10 +114,10 @@ Selecionar lote(s) e quantidade a enviar (sistema sugere ordem FEFO)
 
 ### Alertas de validade
 ```
-Job periódico (ex.: diário) varre lotes ativos
-→ Calcula dias até vencimento
-→ Classifica em faixas configuráveis (ex.: 7 dias, 3 dias, hoje, vencido)
-→ Popula painel por local
+GET /alertas-validade (calculado na hora da consulta, não um job/tabela) →
+→ Filtra lotes com saldo > 0 (opcionalmente por local)
+→ Classifica em: vencidos, vence hoje, vence amanhã, próximos N dias (padrão 7, configurável)
+→ Painel por local (tela "Dashboard", seção 11 — estilo Suflex: contadores por faixa)
 ```
 
 ### Descarte
@@ -163,6 +163,7 @@ Grupo (categoria de produto, ex.: "Frios" > "Laticínios" — 2 níveis: grupo e
 Produto
   ├─ unidade_medida
   ├─ grupo_id (nullable)
+  ├─ validade_padrao_dias (nullable — regra 10, preenche a validade quando não informada)
   └─ MapeamentoProdutoExterno (produto_local_id ↔ produto_saipos_id / produto_varejofacil_id)
 
 Fornecedor

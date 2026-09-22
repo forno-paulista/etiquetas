@@ -91,6 +91,11 @@ model Produto {
   unidadeMedida UnidadeMedida
   grupo         Grupo?        @relation(fields: [grupoId], references: [id])
   grupoId       String?
+  // Validade padrão em dias, usada pra preencher a data de validade
+  // automaticamente em Recebimento/Produção quando não informada na hora
+  // (ex.: queijo = 7 dias). Continua editável manualmente — nunca trava o
+  // usuário (CLAUDE.md § 5, regra 10).
+  validadePadraoDias Int?
   ativo         Boolean       @default(true)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

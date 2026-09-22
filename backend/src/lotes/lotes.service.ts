@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Lote, TipoMovimentoLote } from '@prisma/client';
+import { resolverDataValidade } from '../common/validade.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateLoteDto } from './dto/create-lote.dto.js';
 import type { LotePublicoResponseDto } from './dto/lote-publico-response.dto.js';
@@ -37,6 +38,9 @@ export class LotesService {
       }
     }
 
+    const dataRecebimento = new Date();
+    const dataValidade = resolverDataValidade(dto.dataValidade, dataRecebimento, produto.validadePadraoDias);
+
     const loteId = await this.prisma.$transaction(async (tx) => {
       const lote = await tx.lote.create({
         data: {
@@ -44,7 +48,7 @@ export class LotesService {
           fornecedorId: dto.fornecedorId,
           codigoLote: dto.codigoLote,
           dataFabricacao: dto.dataFabricacao,
-          dataValidade: dto.dataValidade,
+          dataValidade,
           createdById: usuarioId,
         },
       });

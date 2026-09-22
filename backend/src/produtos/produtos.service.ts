@@ -13,7 +13,12 @@ export class ProdutosService {
       await this.validarGrupo(dto.grupoId);
     }
     return this.prisma.produto.create({
-      data: { nome: dto.nome, unidadeMedida: dto.unidadeMedida, grupoId: dto.grupoId },
+      data: {
+        nome: dto.nome,
+        unidadeMedida: dto.unidadeMedida,
+        grupoId: dto.grupoId,
+        validadePadraoDias: dto.validadePadraoDias,
+      },
     });
   }
 
