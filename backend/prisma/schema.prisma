@@ -193,6 +193,10 @@ model MovimentoLote {
   // movimento. Nulo para ENTRADA (o lote em si já é a referência) e
   // para AJUSTE_CONTAGEM (não tem entidade de origem própria).
   referenciaId   String?
+  // Motivo textual livre — obrigatório em AJUSTE_CONTAGEM (CLAUDE.md § 10:
+  // toda divergência de contagem exige justificativa, sem automação de
+  // causa). Opcional nos demais tipos.
+  observacao     String?
   usuario        Usuario           @relation(fields: [usuarioId], references: [id])
   usuarioId      String
   timestamp      DateTime          @default(now())
