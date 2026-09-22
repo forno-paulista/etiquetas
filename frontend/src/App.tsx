@@ -4,8 +4,13 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import { GruposPage } from './pages/admin/GruposPage';
 import { LocaisPage } from './pages/admin/LocaisPage';
+import { MotivosDescartePage } from './pages/admin/MotivosDescartePage';
 import { ProdutosPage } from './pages/admin/ProdutosPage';
+import { AjustesPendentesPage } from './pages/AjustesPendentesPage';
+import { ConsumoPage } from './pages/ConsumoPage';
+import { ContagemPage } from './pages/ContagemPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { DescartePage } from './pages/DescartePage';
 import { LoginPage } from './pages/LoginPage';
 import { LotePage } from './pages/LotePage';
 import { ProducaoPage } from './pages/ProducaoPage';
@@ -80,6 +85,46 @@ export function App() {
         }
       />
       <Route
+        path="/descarte"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <DescartePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/consumo"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ConsumoPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contagem"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ContagemPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/ajustes-pendentes"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <AjustesPendentesPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/produtos"
         element={
           <ProtectedRoute papeis={['ADMIN']}>
@@ -105,6 +150,16 @@ export function App() {
           <ProtectedRoute papeis={['ADMIN']}>
             <Layout>
               <GruposPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/motivos-descarte"
+        element={
+          <ProtectedRoute papeis={['ADMIN']}>
+            <Layout>
+              <MotivosDescartePage />
             </Layout>
           </ProtectedRoute>
         }

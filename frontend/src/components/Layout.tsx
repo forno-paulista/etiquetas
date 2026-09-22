@@ -21,9 +21,14 @@ const LINKS: NavLink[] = [
   { to: '/producao', label: 'Produção' },
   { to: '/transferencias/enviar', label: 'Enviar' },
   { to: '/transferencias/receber', label: 'Receber' },
+  { to: '/descarte', label: 'Descarte' },
+  { to: '/consumo', label: 'Consumo' },
+  { to: '/contagem', label: 'Contagem' },
+  { to: '/ajustes-pendentes', label: 'Ajustes Pendentes' },
   { to: '/admin/produtos', label: 'Produtos', apenasAdmin: true },
   { to: '/admin/grupos', label: 'Grupos', apenasAdmin: true },
   { to: '/admin/locais', label: 'Locais', apenasAdmin: true },
+  { to: '/admin/motivos-descarte', label: 'Motivos de Descarte', apenasAdmin: true },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -50,7 +55,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
           </div>
         </div>
-        <nav className="mt-3 flex gap-4 text-sm">
+        <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           {linksVisiveis.map((link) => (
             <Link
               key={link.to}
