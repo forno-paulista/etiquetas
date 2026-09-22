@@ -38,6 +38,17 @@ Isso sobe Postgres + backend, aplica as migrations automaticamente
 Pra reconstruir depois de mudar código: `docker compose up -d --build`
 de novo.
 
+Banco vazio não tem usuário nenhum — sem isso não dá pra logar. Rode o
+seed (cria Organização, o Local do CD e um usuário Admin inicial):
+
+```bash
+cd backend && npm run db:seed
+```
+
+O e-mail/senha do Admin saem no log do comando (`SEED_ADMIN_EMAIL` /
+`SEED_ADMIN_SENHA` no `.env` pra customizar) — troque a senha assim que
+acessar pela primeira vez.
+
 ### B) Só o Postgres em Docker, backend direto no host (iteração mais rápida)
 
 ```bash
@@ -49,6 +60,7 @@ cd backend
 cp .env.example .env
 npm install
 npx prisma migrate dev
+npm run db:seed
 npm run start:dev
 ```
 

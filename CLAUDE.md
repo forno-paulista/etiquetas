@@ -73,7 +73,7 @@ O QR Code carrega **apenas um identificador** (URL curta apontando para o lote n
 11. Consumo de matéria-prima em uma Produção pode ter **origem desconhecida** (ex.: sobra antiga, item que não passou pelo fluxo de recebimento do sistema) — nesse caso, `lote_origem_id` é nulo, mas `origem_desconhecida = true` e uma descrição textual são obrigatórias. Nunca um consumo sem explicação.
 12. A promessa de rastreabilidade do sistema é: **"completa para tudo que entrou pelo fluxo de recebimento do sistema, com gaps explicitamente marcados quando a origem é desconhecida"** — não uma promessa de rastreabilidade absoluta.
 13. **Empacotamento físico (ex.: um "sacão" com N porcionados) não é uma entidade própria no sistema** — é reimpressão da etiqueta/QR do mesmo `Lote`, com a quantidade daquele pacote específico anotada na etiqueta impressa (ex.: "10 un / 700g" no sacão vs. "1 un / 70g" em cada porcionado individual). Consistente com o rastreio agregado por lote (regra 4) — o sistema não precisa saber qual unidade física específica é qual, só a quantidade total do lote.
-14. Consumo/uso operacional de um lote na loja (ex.: retirar um porcionado da câmara fria pra usar) gera `MovimentoLote` tipo `CONSUMO` — decrementa saldo como um `Descarte`, mas **não é perda**: não exige motivo, não aciona `VarejoFacilStockProvider` nem `AjustePendente`. Existe separado da baixa automática de venda do Saipos (que já não é rastreada por lote, ver seção 9) — é um registro manual complementar, não uma tentativa de sincronizar com o Saipos.
+14. Consumo/uso operacional de um lote na loja (ex.: retirar um porcionado da câmara fria pra usar) gera `MovimentoLote` tipo `CONSUMO` — mesma mecânica de tela do `Descarte` (buscar/escanear lote, informar quantidade, registrar), mas **não é perda**: não exige motivo, não aciona `VarejoFacilStockProvider` nem `AjustePendente`. **Não precisa ser lançado no momento exato do uso** — o registro guarda só lote + quantidade + quem lançou + quando foi *registrado* (não quando foi fisicamente usado), então o lançamento pode ser em lote no fim do turno/dia, sem parar a operação pra escanear cada unidade retirada. Existe separado da baixa automática de venda do Saipos (que já não é rastreada por lote, ver seção 9) — é um registro manual complementar, não uma tentativa de sincronizar com o Saipos.
 
 ## 6. Fluxos principais
 
@@ -132,8 +132,10 @@ Scan do QR Code do lote
 
 ### Consumo/Baixa na loja
 ```
-Scan do QR Code do lote (ex.: porcionado retirado da câmara fria pra usar)
-→ Confirmar quantidade usada
+Buscar/escanear o lote (feito em lote/lançamento único, ex. no fim do dia
+ou turno — não precisa parar a produção pra escanear cada porcionado no
+momento em que é retirado)
+→ Informar quantidade total usada naquele período
 → Sistema registra MovimentoLote (CONSUMO) + decrementa saldo do lote
   (sem motivo, sem acionar StockProvider nem AjustePendente — regra 14)
 ```
@@ -187,6 +189,7 @@ MovimentoLote  (append-only — fonte de verdade, nunca editado/apagado)
   ├─ quantidade (+/-)
   ├─ local_origem_id, local_destino_id (conforme tipo)
   ├─ referencia_id (aponta para Entrada, Transferencia, Descarte ou Producao que originou)
+  ├─ observacao (texto livre — obrigatório em AJUSTE_CONTAGEM, regra/seção 10; opcional nos demais)
   ├─ usuario_id
   └─ timestamp
 
@@ -256,6 +259,7 @@ PostgreSQL   Integration Layer
 - `StockProvider`: interface comum (`consultarSaldo`, etc.). Escrita fica numa interface separada (`WritableStockProvider extends StockProvider`) que só `VarejoFacilStockProvider` implementa — `SaiposStockProvider` não a implementa (ou lança "não suportado").
 - **Nenhuma regra de domínio (Lote, Transferência, Descarte, Produção) conhece "Saipos" ou "Varejo Fácil" diretamente** — só conhece a interface `StockProvider`. Trocar de ERP = trocar a implementação injetada.
 - Mapeamento de produto entre sistemas é manual (`MapeamentoProdutoExterno`), não há necessidade de sincronizar catálogo inteiro.
+- **`LabelPrinterProvider`**: mesmo padrão de interface aplicado à impressão de etiqueta. Nenhuma regra de domínio (Recebimento, Produção) sabe *como* a etiqueta é impressa, só que existe uma etiqueta pra imprimir a partir de um `Lote` + quantidade. Motivo: um navegador não fala diretamente o protocolo de impressoras térmicas (ZPL) por segurança — existem pelo menos 3 formas de imprimir (driver do SO via diálogo de impressão do navegador, agente de impressão local na rede que fala ZPL com a impressora, ou geração de PDF manual), e a empresa ainda não decidiu qual hardware vai usar após sair da Suflex (que hoje aluga impressora + etiqueta BOPP, seção 18.1). Implementação inicial planejada: `BrowserPrintProvider` (HTML/CSS formatado no tamanho da etiqueta + diálogo nativo do navegador) — mais simples, cobre o MVP. Trocar para impressão térmica direta (ZPL) depois é só trocar a implementação injetada, sem tocar no domínio.
 
 ## 9. Estratégia de sincronização (ponto arquitetural mais delicado)
 
@@ -280,7 +284,7 @@ Nenhuma divergência é absorvida silenciosamente.
 - Produção/Porcionamento (seleção de lote(s) de origem + geração de novo lote)
 - Transferência — Enviar (CD/loja, sugestão FEFO)
 - Transferência — Receber (scan + confirmação de quantidade)
-- Consumo/Baixa (scan + quantidade usada, regra 14)
+- Consumo/Baixa (lançamento em lote no fim do turno/dia, mesma mecânica do Descarte — regra 14)
 - Contagem (seleção de lote(s) + quantidade contada, gera Ajuste de Contagem)
 - Descarte (scan + formulário)
 - Fila de Ajustes Pendentes (por loja)
@@ -342,7 +346,8 @@ Infra:     Docker (backend + Postgres em containers)
 
 ## 17. Pontos ainda em aberto (para decidir durante o desenvolvimento)
 
-- Layout final da etiqueta (dimensões, impressora térmica vs. comum).
+- **Hardware de impressão**: a empresa vai continuar alugando impressora/etiqueta da Suflex, comprar impressora térmica própria, ou usar impressora comum? Define se `LabelPrinterProvider` (seção 8) precisa de suporte a ZPL/agente local desde já ou se `BrowserPrintProvider` (impressão via navegador) resolve por enquanto.
+- Layout final da etiqueta (dimensões — Suflex usa ~60×60mm BOPP).
 - Regras específicas de expiração de token / política de sessão.
 - Se e quando implementar notificações automáticas (e-mail/WhatsApp) de validade.
 - Se vale a pena, no futuro, registrar `referencia_fiscal` de fato (hoje o campo existe mas não é usado).
@@ -472,19 +477,34 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
    10; lojas pedem suprimento ao CD, que transfere via `Transferencia`
    normal, seção 6). Não é um fluxo copiado do Suflex (que não tem
    Recebimento ativo nesta conta) — é definição própria do negócio.
-6. **Consumo/baixa na loja**: novo tipo de movimento `CONSUMO` (regra 14,
-   seção 5) — proposta feita para cobrir o caso de "retirar e usar" um
-   porcionado na loja, pendente de confirmação final do usuário antes de
-   considerar fechado.
+6. **Consumo/baixa na loja**: confirmado. Novo tipo de movimento `CONSUMO`
+   (regra 14, seção 5), com a mesma mecânica de tela do `Descarte`.
+   Importante: **não é lançado em tempo real por unidade retirada** —
+   inviável no meio da produção — é lançado em lote (ex.: fim do turno/dia,
+   quantidade total usada de cada lote).
+7. **Impressão de etiqueta**: interface `LabelPrinterProvider` (seção 8),
+   implementação inicial via navegador (`BrowserPrintProvider`). Hardware
+   final (impressora térmica própria vs. continuar com a Suflex vs.
+   impressora comum) ainda em aberto — seção 17.
 
 ---
 
 ## Estado do repositório
 
 - `backend/`: API NestJS + Prisma (schema de dados da seção 7 já modelado em `backend/prisma/schema.prisma`), com `Dockerfile` multi-stage (build → runtime) para rodar containerizado.
+- `backend/src/auth/`: autenticação implementada — JWT de acesso curto + refresh token com rotação (tabela `RefreshToken`), senha com argon2, guards globais (`JwtAuthGuard` + `RolesGuard` via `APP_GUARD` — toda rota exige autenticação por padrão, endpoints públicos usam `@Public()`) e `LocalAccessGuard` por rota pra checar acesso por local (seção 12). `prisma/seed.ts` cria o usuário Admin inicial (`npm run db:seed`).
+- `backend/src/usuarios/`: CRUD de usuários (criar, listar, buscar, atualizar papel/status/locais), restrito a `ADMIN` via `@Roles`. É como se cria login pra alguém além do Admin do seed.
+- Cadastros base implementados, todos restritos a `ADMIN`: `backend/src/locais/`, `backend/src/grupos/` (hierarquia de 2 níveis reforçada no service — tentar criar um 3º nível dá 400), `backend/src/fornecedores/`, `backend/src/motivos-descarte/`, `backend/src/produtos/` (com `grupoId` opcional).
+- `backend/src/lotes/`: primeiro módulo de domínio de verdade. `POST /lotes` é o Recebimento (cria Lote + SaldoLote + MovimentoLote ENTRADA numa transação, protegido por `LocalAccessGuard`); `GET /lotes/:id` é a consulta autenticada com histórico completo; `GET /lotes/qr/:qrCodeId` é a consulta pública via QR (`@Public()`, dados básicos só — seção 13).
+- `backend/src/producao/`: `POST /producao` consome N lotes de origem (conhecidos e/ou de origem desconhecida — regra 11) e gera um novo `Lote` + `MovimentoLote(PRODUCAO_ENTRADA/PRODUCAO_CONSUMO)`, tudo numa transação. Valida saldo suficiente de cada lote de origem antes de mexer em qualquer coisa.
+- `backend/src/transferencias/`: `POST /transferencias` envia (decrementa saldo na origem na hora, status `EM_TRANSITO`); `PATCH /transferencias/:id/confirmar` recebe (incrementa saldo no destino pela quantidade *confirmada*, não a enviada — vira `CONCLUIDA` ou `DIVERGENTE`, nunca corrigido sozinho, regra 8). `LocalAccessGuard` foi generalizado pra reconhecer `localOrigemId`/`localDestinoId`, não só `localId`.
+- `backend/src/consumo/`: `POST /consumo` registra baixa manual (regra 14) — só `MovimentoLote(CONSUMO)`, não tem tabela própria.
+- `backend/src/descarte/` + `backend/src/ajustes-pendentes/`: `POST /descartes` decide `statusAjusteExterno` pelo tipo do local — CD vira `PENDENTE` (`VarejoFacilStockProvider` ainda não existe, ver seção 8), Loja vira `ENVIADO_FILA` + cria `AjustePendente`. `PATCH /ajustes-pendentes/:id/marcar-lancado` fecha o ciclo (fila da seção 11) e propaga `AJUSTADO_NO_ERP` de volta pro Descarte.
+- `backend/src/contagem/`: `POST /contagem` só gera `MovimentoLote(AJUSTE_CONTAGEM)` se a contagem divergir do saldo — e exige `observacao` (campo novo em `MovimentoLote`, não existia antes) quando diverge, regra/seção 10. Sem divergência, não cria nada.
 - `frontend/`: ainda não iniciado — próxima etapa após a API e o modelo de dados estarem estáveis.
 - `docker-compose.yml`: sobe Postgres + backend juntos. É o mesmo compose usado local e em produção (VPS/VM na nuvem) — só muda o `.env`. Ver seção "Deploy" no `README.md`.
 - `prisma migrate deploy` roda automaticamente no boot do container do backend (`Dockerfile`, `CMD`). Válido para uma única réplica; reavaliar se algum dia escalar horizontalmente.
+- **Todos os módulos de domínio do MVP (seção 4) estão implementados e testados de ponta a ponta** (recebimento, produção, transferência, consumo, descarte, contagem). Falta: `StockProvider` (Saipos/Varejo Fácil — precisa de detalhes reais da API, combinado com o usuário), `LabelPrinterProvider`, rate limiting no endpoint público de QR (seção 15 pede), e todo o frontend.
 
 ## Padrões de documentação
 
