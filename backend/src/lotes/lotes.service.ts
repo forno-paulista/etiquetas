@@ -3,7 +3,7 @@ import { Lote, TipoMovimentoLote } from '@prisma/client';
 import { resolverDataValidade } from '../common/validade.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateLoteDto } from './dto/create-lote.dto.js';
-import type { LotePublicoResponseDto } from './dto/lote-publico-response.dto.js';
+import type { LoteResumoResponseDto } from './dto/lote-resumo-response.dto.js';
 
 const loteComRelacoesInclude = {
   produto: true,
@@ -47,7 +47,7 @@ export class LotesService {
           produtoId: dto.produtoId,
           fornecedorId: dto.fornecedorId,
           codigoLote: dto.codigoLote,
-          dataFabricacao: dto.dataFabricacao,
+          dataFabricacao: dto.dataFabricacao ? new Date(dto.dataFabricacao) : undefined,
           dataValidade,
           createdById: usuarioId,
         },
@@ -84,7 +84,7 @@ export class LotesService {
     return lote;
   }
 
-  async findByQrCodePublico(qrCodeId: string): Promise<LotePublicoResponseDto> {
+  async findByQrCode(qrCodeId: string): Promise<LoteResumoResponseDto> {
     const lote = await this.prisma.lote.findUnique({
       where: { qrCodeId },
       include: { produto: true, saldos: true },

@@ -6,6 +6,7 @@ import { listarFornecedores } from '../lib/api/fornecedores';
 import { listarLocais } from '../lib/api/locais';
 import { receberLote, type Lote } from '../lib/api/lotes';
 import { listarProdutos } from '../lib/api/produtos';
+import { formatarData } from '../lib/formatarData';
 import { buttonPrimaryClass, buttonSecondaryClass, inputClass, labelClass } from '../lib/formStyles';
 
 interface FormState {
@@ -41,7 +42,7 @@ function QrCodeEtiqueta({ lote }: { lote: Lote }) {
       <div className="mb-2 text-lg font-semibold text-neutral-900">{lote.produto.nome}</div>
       <div className="mb-1 text-sm text-neutral-600">Lote {lote.codigoLote}</div>
       <div className="mb-3 text-sm text-neutral-600">
-        Validade: {new Date(lote.dataValidade).toLocaleDateString('pt-BR')}
+        Validade: {formatarData(lote.dataValidade)}
       </div>
       {qrSrc && <img src={qrSrc} alt="QR Code do lote" className="mx-auto" />}
       <div className="mt-2 text-xs text-neutral-400">{lote.qrCodeId}</div>

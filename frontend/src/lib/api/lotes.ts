@@ -41,7 +41,7 @@ export interface Lote {
   movimentos: MovimentoLote[];
 }
 
-export interface LotePublico {
+export interface LoteResumo {
   produtoNome: string;
   codigoLote: string;
   dataValidade: string;
@@ -60,7 +60,8 @@ export async function buscarLote(id: string): Promise<Lote> {
   return data;
 }
 
-export async function buscarLotePorQr(qrCodeId: string): Promise<LotePublico> {
-  const { data } = await apiClient.get<LotePublico>(`/lotes/qr/${qrCodeId}`);
+// Autenticado — não é mais uma consulta pública (decisão revertida).
+export async function buscarLotePorQr(qrCodeId: string): Promise<LoteResumo> {
+  const { data } = await apiClient.get<LoteResumo>(`/lotes/qr/${qrCodeId}`);
   return data;
 }

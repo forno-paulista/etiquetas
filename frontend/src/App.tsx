@@ -5,7 +5,7 @@ import { useAuth } from './context/AuthContext';
 import { ProdutosPage } from './pages/admin/ProdutosPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
-import { LotePublicoPage } from './pages/LotePublicoPage';
+import { LotePage } from './pages/LotePage';
 import { RecebimentoPage } from './pages/RecebimentoPage';
 
 export function App() {
@@ -14,7 +14,16 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
-      <Route path="/l/:qrCodeId" element={<LotePublicoPage />} />
+      <Route
+        path="/l/:qrCodeId"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <LotePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard"
         element={

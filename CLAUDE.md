@@ -306,7 +306,7 @@ Nenhuma divergência é absorvida silenciosamente.
 ## 13. QR Code
 
 - Formato: URL curta (`https://.../l/{codigo_curto}`), nunca JSON embutido.
-- Ao escanear, abre página web; visualização básica sem login, ações sensíveis (descarte, confirmação) exigem autenticação.
+- **Decisão revertida (2026-09-22): a consulta por QR Code exige login, sempre — não existe mais visualização pública/sem autenticação.** O plano original (visualização básica sem login, só ações sensíveis autenticadas) foi trocado a pedido do usuário: é uso interno, não deve ser acessível por qualquer um que ache uma etiqueta. `GET /lotes/qr/:qrCodeId` deixou de ser `@Public()`; o rate limiting mais apertado que existia especificamente por ser endpoint público também foi removido (o limite geral da API já cobre).
 - QR Code gerado uma vez na criação do lote, não muda mesmo que a quantidade varie.
 - Etiqueta impressa mostra: nome do produto, lote, validade, quantidade original, QR Code — é uma "foto do momento", a fonte de verdade é sempre o sistema.
 
@@ -334,7 +334,7 @@ Auth:      JWT (expiração curta + refresh token)
 
 Segurança: HTTPS obrigatório em produção
            Checagem de papel + local sempre no backend (nunca confiar só no frontend)
-           Rate limiting em endpoints públicos de leitura de QR Code
+           Rate limiting geral na API (não há mais endpoint público de QR — seção 13)
            Logs de auditoria gravados em banco (não só arquivo)
 
 Infra:     Docker (backend + Postgres em containers)
@@ -498,7 +498,7 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
 - `backend/src/auth/`: autenticação implementada — JWT de acesso curto + refresh token com rotação (tabela `RefreshToken`), senha com argon2, guards globais (`JwtAuthGuard` + `RolesGuard` via `APP_GUARD` — toda rota exige autenticação por padrão, endpoints públicos usam `@Public()`) e `LocalAccessGuard` por rota pra checar acesso por local (seção 12). `prisma/seed.ts` cria o usuário Admin inicial (`npm run db:seed`).
 - `backend/src/usuarios/`: CRUD de usuários (criar, listar, buscar, atualizar papel/status/locais), restrito a `ADMIN` via `@Roles`. É como se cria login pra alguém além do Admin do seed.
 - Cadastros base implementados, todos restritos a `ADMIN`: `backend/src/locais/`, `backend/src/grupos/` (hierarquia de 2 níveis reforçada no service — tentar criar um 3º nível dá 400), `backend/src/fornecedores/`, `backend/src/motivos-descarte/`, `backend/src/produtos/` (com `grupoId` opcional).
-- `backend/src/lotes/`: primeiro módulo de domínio de verdade. `POST /lotes` é o Recebimento (cria Lote + SaldoLote + MovimentoLote ENTRADA numa transação, protegido por `LocalAccessGuard`); `GET /lotes/:id` é a consulta autenticada com histórico completo; `GET /lotes/qr/:qrCodeId` é a consulta pública via QR (`@Public()`, dados básicos só — seção 13).
+- `backend/src/lotes/`: primeiro módulo de domínio de verdade. `POST /lotes` é o Recebimento (cria Lote + SaldoLote + MovimentoLote ENTRADA numa transação, protegido por `LocalAccessGuard`); `GET /lotes/:id` é a consulta autenticada com histórico completo; `GET /lotes/qr/:qrCodeId` é a consulta resumida via QR, também autenticada (dados básicos só — seção 13, não é mais público).
 - `backend/src/producao/`: `POST /producao` consome N lotes de origem (conhecidos e/ou de origem desconhecida — regra 11) e gera um novo `Lote` + `MovimentoLote(PRODUCAO_ENTRADA/PRODUCAO_CONSUMO)`, tudo numa transação. Valida saldo suficiente de cada lote de origem antes de mexer em qualquer coisa.
 - `backend/src/transferencias/`: `POST /transferencias` envia (decrementa saldo na origem na hora, status `EM_TRANSITO`); `PATCH /transferencias/:id/confirmar` recebe (incrementa saldo no destino pela quantidade *confirmada*, não a enviada — vira `CONCLUIDA` ou `DIVERGENTE`, nunca corrigido sozinho, regra 8). `LocalAccessGuard` foi generalizado pra reconhecer `localOrigemId`/`localDestinoId`, não só `localId`.
 - `backend/src/consumo/`: `POST /consumo` registra baixa manual (regra 14) — só `MovimentoLote(CONSUMO)`, não tem tabela própria.
@@ -507,7 +507,7 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
 - `frontend/`: iniciado — Vite + React + TypeScript, Tailwind, React Router, TanStack Query. Capacitor ainda não entrou (só quando for empacotar como app nativo de verdade, seção 15 — a PWA não precisa disso pra existir).
   - `src/lib/apiClient.ts`: instância do axios com refresh automático de token no 401 (fila única de refresh, evita disparar vários em paralelo).
   - `src/context/AuthContext.tsx` + `ProtectedRoute`: sessão guardada no `localStorage` (trade-off consciente — o backend devolve os tokens no corpo, não em cookie httpOnly).
-  - Telas prontas: Login, Dashboard (`/alertas-validade`, filtro por local, cards clicáveis), Produtos (`/admin/produtos`, CRUD simples, só Admin), Recebimento (`/recebimento`, gera o `Lote` + mostra a etiqueta com QR Code renderizado no cliente via lib `qrcode`), Consulta pública de Lote (`/l/:qrCodeId`, sem login, consome o endpoint público — é a página pro que o QR code aponta). Todas testadas de ponta a ponta no navegador contra o backend real, incluindo o ciclo completo Recebimento → QR → consulta pública sem sessão.
+  - Telas prontas: Login, Dashboard (`/alertas-validade`, filtro por local, cards clicáveis), Produtos (`/admin/produtos`, CRUD simples, só Admin), Recebimento (`/recebimento`, gera o `Lote` + mostra a etiqueta com QR Code renderizado no cliente via lib `qrcode`), Consulta de Lote via QR (`/l/:qrCodeId`, autenticada — é a página pro que o QR code aponta, mas exige login, seção 13). Todas testadas de ponta a ponta no navegador contra o backend real.
   - `src/lib/formStyles.ts`: classes de formulário centralizadas (o bug do texto invisível em modo escuro veio de inputs sem `bg`/cor de texto explícitos — não repetir isso tela a tela).
   - Achado ao integrar: os 5 endpoints de cadastro (`locais`, `produtos`, `fornecedores`, `grupos`, `motivos-descarte`) estavam com `GET` restrito a `ADMIN` — corrigido pra liberar leitura a qualquer papel autenticado (só escrita continua Admin-only), porque os formulários de qualquer usuário precisam popular esses dropdowns.
 - `docker-compose.yml`: sobe Postgres + backend juntos. É o mesmo compose usado local e em produção (VPS/VM na nuvem) — só muda o `.env`. Ver seção "Deploy" no `README.md`. Frontend ainda não entrou no compose (roda via `npm run dev` direto por enquanto).

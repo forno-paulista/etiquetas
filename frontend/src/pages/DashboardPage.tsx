@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { buscarAlertasValidade, type LoteAlerta } from '../lib/api/alertasValidade';
 import { listarLocais } from '../lib/api/locais';
+import { formatarData } from '../lib/formatarData';
 import { inputClass } from '../lib/formStyles';
 
 type Bucket = 'vencidos' | 'hoje' | 'amanha' | 'proximos';
@@ -92,7 +93,7 @@ export function DashboardPage() {
                         {item.quantidadeAtual} {item.unidadeMedida}
                       </div>
                       <div className="text-neutral-500">
-                        {new Date(item.dataValidade).toLocaleDateString('pt-BR')}
+                        {formatarData(item.dataValidade)}
                       </div>
                     </div>
                   </li>
