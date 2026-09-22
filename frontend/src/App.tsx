@@ -3,11 +3,14 @@ import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import { GruposPage } from './pages/admin/GruposPage';
+import { LocaisPage } from './pages/admin/LocaisPage';
 import { ProdutosPage } from './pages/admin/ProdutosPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { LotePage } from './pages/LotePage';
 import { RecebimentoPage } from './pages/RecebimentoPage';
+import { TransferenciaEnviarPage } from './pages/TransferenciaEnviarPage';
+import { TransferenciaReceberPage } from './pages/TransferenciaReceberPage';
 
 export function App() {
   const { isAuthenticated } = useAuth();
@@ -46,11 +49,41 @@ export function App() {
         }
       />
       <Route
+        path="/transferencias/enviar"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TransferenciaEnviarPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/transferencias/receber"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TransferenciaReceberPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/produtos"
         element={
           <ProtectedRoute papeis={['ADMIN']}>
             <Layout>
               <ProdutosPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/locais"
+        element={
+          <ProtectedRoute papeis={['ADMIN']}>
+            <Layout>
+              <LocaisPage />
             </Layout>
           </ProtectedRoute>
         }

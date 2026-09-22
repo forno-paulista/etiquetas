@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Lote, TipoMovimentoLote } from '@prisma/client';
+import { Lote, Prisma, TipoMovimentoLote } from '@prisma/client';
 import { gerarCodigoLotePadrao } from '../common/codigo-lote.util.js';
 import { resolverDataValidade } from '../common/validade.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateLoteDto } from './dto/create-lote.dto.js';
+import type { FindLotesQueryDto } from './dto/find-lotes-query.dto.js';
 import type { LoteResumoResponseDto } from './dto/lote-resumo-response.dto.js';
 
 const loteComRelacoesInclude = {
@@ -80,6 +81,29 @@ export class LotesService {
     });
 
     return this.findOne(loteId);
+  }
+
+  // Lista lotes pra escolher em Transferência/Produção/Descarte/Consumo —
+  // não expõe histórico de movimentos (isso é GET /lotes/:id), só o
+  // necessário pra montar a lista/seletor. Ordenado por validade (FEFO é
+  // recomendação de UI, regra 5 do CLAUDE.md, não uma trava).
+  async findAll(query: FindLotesQueryDto) {
+    const saldoWhere: Prisma.SaldoLoteWhereInput = {
+      ...(query.localId ? { localId: query.localId } : {}),
+      ...(query.comSaldo === false ? {} : { quantidadeAtual: { gt: 0 } }),
+    };
+
+    return this.prisma.lote.findMany({
+      where: {
+        ...(query.produtoId ? { produtoId: query.produtoId } : {}),
+        saldos: { some: saldoWhere },
+      },
+      include: {
+        produto: true,
+        saldos: { where: saldoWhere, include: { local: true } },
+      },
+      orderBy: { dataValidade: 'asc' },
+    });
   }
 
   async findOne(id: string) {

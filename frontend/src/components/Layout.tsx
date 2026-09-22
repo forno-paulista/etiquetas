@@ -18,8 +18,11 @@ interface NavLink {
 const LINKS: NavLink[] = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/recebimento', label: 'Recebimento' },
+  { to: '/transferencias/enviar', label: 'Enviar' },
+  { to: '/transferencias/receber', label: 'Receber' },
   { to: '/admin/produtos', label: 'Produtos', apenasAdmin: true },
   { to: '/admin/grupos', label: 'Grupos', apenasAdmin: true },
+  { to: '/admin/locais', label: 'Locais', apenasAdmin: true },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {

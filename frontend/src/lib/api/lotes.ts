@@ -50,6 +50,29 @@ export interface LoteResumo {
   unidadeMedida: string;
 }
 
+// Retorno de GET /lotes — pra escolher um lote em Transferência, Produção,
+// Descarte, Consumo. Vem ordenado por validade (FEFO é recomendação de UI,
+// regra 5 do CLAUDE.md). `saldos` já vem filtrado pelo `localId` da busca,
+// quando informado.
+export interface LoteComSaldo {
+  id: string;
+  codigoLote: string;
+  dataValidade: string;
+  produto: { id: string; nome: string; unidadeMedida: UnidadeMedida };
+  saldos: SaldoLote[];
+}
+
+export interface ListarLotesParams {
+  produtoId?: string;
+  localId?: string;
+  comSaldo?: boolean;
+}
+
+export async function listarLotes(params: ListarLotesParams): Promise<LoteComSaldo[]> {
+  const { data } = await apiClient.get<LoteComSaldo[]>('/lotes', { params });
+  return data;
+}
+
 export async function receberLote(input: CreateLoteInput): Promise<Lote> {
   const { data } = await apiClient.post<Lote>('/lotes', input);
   return data;
