@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { useAuth } from '../context/AuthContext';
 import { listarLocais } from '../lib/api/locais';
 import { listarLotes } from '../lib/api/lotes';
@@ -118,40 +119,32 @@ function ConsumoRow({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <label className={labelClass}>Produto de origem</label>
-            <select
-              required
+            <SearchableSelect
               disabled={!localId}
               value={row.produtoOrigemId}
-              onChange={(e) => onChange({ ...row, produtoOrigemId: e.target.value, loteOrigemId: '' })}
-              className={inputClass}
-            >
-              <option value="">Selecione...</option>
-              {produtos
-                ?.filter((p) => p.ativo)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-            </select>
+              onChange={(id) => onChange({ ...row, produtoOrigemId: id, loteOrigemId: '' })}
+              options={produtos?.filter((p) => p.ativo) ?? []}
+              getId={(p) => p.id}
+              getLabel={(p) => p.nome}
+              placeholder="Buscar produto..."
+              emptyMessage="Nenhum produto encontrado."
+            />
           </div>
           <div>
             <label className={labelClass}>Lote (FEFO)</label>
-            <select
-              required
+            <SearchableSelect
               disabled={!row.produtoOrigemId}
               value={row.loteOrigemId}
-              onChange={(e) => onChange({ ...row, loteOrigemId: e.target.value })}
-              className={inputClass}
-            >
-              <option value="">Selecione...</option>
-              {lotes?.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.codigoLote} — válido até {formatarData(l.dataValidade)} —{' '}
-                  {l.saldos[0]?.quantidadeAtual ?? 0} {l.produto.unidadeMedida}
-                </option>
-              ))}
-            </select>
+              onChange={(id) => onChange({ ...row, loteOrigemId: id })}
+              options={lotes ?? []}
+              getId={(l) => l.id}
+              getLabel={(l) => l.codigoLote}
+              getDescricao={(l) =>
+                `Válido até ${formatarData(l.dataValidade)} — ${l.saldos[0]?.quantidadeAtual ?? 0} ${l.produto.unidadeMedida}`
+              }
+              placeholder="Buscar lote pelo código..."
+              emptyMessage="Nenhum lote com saldo desse produto nesse local."
+            />
           </div>
           <div>
             <label className={labelClass}>
@@ -207,6 +200,14 @@ export function ProducaoPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!form.produtoSaidaId) {
+      setErro('Selecione o produto de saída.');
+      return;
+    }
+    if (form.consumos.some((c) => !c.origemDesconhecida && !c.loteOrigemId)) {
+      setErro('Selecione um lote de origem em cada linha de consumo (ou marque origem desconhecida).');
+      return;
+    }
     criar.mutate({
       produtoSaidaId: form.produtoSaidaId,
       localId: form.localId,
@@ -277,22 +278,16 @@ export function ProducaoPage() {
             <label className={labelClass} htmlFor="produtoSaida">
               Produto de saída (o que está sendo produzido/porcionado)
             </label>
-            <select
+            <SearchableSelect
               id="produtoSaida"
-              required
               value={form.produtoSaidaId}
-              onChange={(e) => setForm({ ...form, produtoSaidaId: e.target.value })}
-              className={inputClass}
-            >
-              <option value="">Selecione...</option>
-              {produtos
-                ?.filter((p) => p.ativo)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-            </select>
+              onChange={(id) => setForm({ ...form, produtoSaidaId: id })}
+              options={produtos?.filter((p) => p.ativo) ?? []}
+              getId={(p) => p.id}
+              getLabel={(p) => p.nome}
+              placeholder="Buscar produto..."
+              emptyMessage="Nenhum produto encontrado."
+            />
           </div>
 
           <div>

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { listarLocais } from '../lib/api/locais';
 import { listarLotes } from '../lib/api/lotes';
 import { listarProdutos } from '../lib/api/produtos';
@@ -30,19 +31,16 @@ export function ConsultaLotePage() {
           <label className={labelClass} htmlFor="produto">
             Produto
           </label>
-          <select
+          <SearchableSelect
             id="produto"
             value={produtoId}
-            onChange={(e) => setProdutoId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Selecione...</option>
-            {produtos?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
-          </select>
+            onChange={setProdutoId}
+            options={produtos ?? []}
+            getId={(p) => p.id}
+            getLabel={(p) => p.nome}
+            placeholder="Buscar produto..."
+            emptyMessage="Nenhum produto encontrado."
+          />
         </div>
 
         <div>

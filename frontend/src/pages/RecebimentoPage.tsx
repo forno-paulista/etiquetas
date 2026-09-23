@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import QRCode from 'qrcode';
 import { useEffect, useState, type FormEvent } from 'react';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { useAuth } from '../context/AuthContext';
 import { listarFornecedores } from '../lib/api/fornecedores';
 import { listarLocais } from '../lib/api/locais';
@@ -82,6 +83,10 @@ export function RecebimentoPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!form.produtoId) {
+      setErro('Selecione um produto.');
+      return;
+    }
     receber.mutate({
       produtoId: form.produtoId,
       localId: form.localId,
@@ -142,22 +147,16 @@ export function RecebimentoPage() {
             <label className={labelClass} htmlFor="produto">
               Produto
             </label>
-            <select
+            <SearchableSelect
               id="produto"
-              required
               value={form.produtoId}
-              onChange={(e) => setForm({ ...form, produtoId: e.target.value })}
-              className={inputClass}
-            >
-              <option value="">Selecione...</option>
-              {produtos
-                ?.filter((p) => p.ativo)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-            </select>
+              onChange={(id) => setForm({ ...form, produtoId: id })}
+              options={produtos?.filter((p) => p.ativo) ?? []}
+              getId={(p) => p.id}
+              getLabel={(p) => p.nome}
+              placeholder="Buscar produto..."
+              emptyMessage="Nenhum produto encontrado."
+            />
           </div>
 
           <div>

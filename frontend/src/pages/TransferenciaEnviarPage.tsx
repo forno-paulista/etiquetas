@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { useAuth } from '../context/AuthContext';
 import { listarLocais } from '../lib/api/locais';
 import { listarLotes } from '../lib/api/lotes';
@@ -58,6 +59,10 @@ export function TransferenciaEnviarPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!form.loteId) {
+      setErro('Selecione um lote.');
+      return;
+    }
     enviar.mutate({
       loteId: form.loteId,
       localOrigemId: form.localOrigemId,
@@ -146,23 +151,17 @@ export function TransferenciaEnviarPage() {
             <label className={labelClass} htmlFor="produto">
               Produto
             </label>
-            <select
+            <SearchableSelect
               id="produto"
-              required
               disabled={!form.localOrigemId}
               value={form.produtoId}
-              onChange={(e) => setForm({ ...form, produtoId: e.target.value, loteId: '' })}
-              className={inputClass}
-            >
-              <option value="">Selecione...</option>
-              {produtos
-                ?.filter((p) => p.ativo)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-            </select>
+              onChange={(id) => setForm({ ...form, produtoId: id, loteId: '' })}
+              options={produtos?.filter((p) => p.ativo) ?? []}
+              getId={(p) => p.id}
+              getLabel={(p) => p.nome}
+              placeholder="Buscar produto..."
+              emptyMessage="Nenhum produto encontrado."
+            />
           </div>
 
           <div>
@@ -172,25 +171,20 @@ export function TransferenciaEnviarPage() {
                 (mais próximo do vencimento primeiro — FEFO)
               </span>
             </label>
-            <select
+            <SearchableSelect
               id="lote"
-              required
               disabled={!form.produtoId}
               value={form.loteId}
-              onChange={(e) => setForm({ ...form, loteId: e.target.value })}
-              className={inputClass}
-            >
-              <option value="">Selecione...</option>
-              {lotes?.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.codigoLote} — válido até {formatarData(l.dataValidade)} —{' '}
-                  {l.saldos[0]?.quantidadeAtual ?? 0} {l.produto.unidadeMedida} disponível
-                </option>
-              ))}
-            </select>
-            {form.produtoId && form.localOrigemId && lotes?.length === 0 && (
-              <p className="mt-1 text-xs text-neutral-500">Nenhum lote com saldo desse produto nesse local.</p>
-            )}
+              onChange={(id) => setForm({ ...form, loteId: id })}
+              options={lotes ?? []}
+              getId={(l) => l.id}
+              getLabel={(l) => l.codigoLote}
+              getDescricao={(l) =>
+                `Válido até ${formatarData(l.dataValidade)} — ${l.saldos[0]?.quantidadeAtual ?? 0} ${l.produto.unidadeMedida} disponível`
+              }
+              placeholder="Buscar lote pelo código..."
+              emptyMessage="Nenhum lote com saldo desse produto nesse local."
+            />
           </div>
 
           <div>

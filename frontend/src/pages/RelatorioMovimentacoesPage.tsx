@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { SearchableSelect } from '../components/SearchableSelect';
 import { listarLocais } from '../lib/api/locais';
 import { listarProdutos } from '../lib/api/produtos';
 import { listarMovimentos, type TipoMovimentoLote } from '../lib/api/relatorios';
@@ -57,19 +58,16 @@ export function RelatorioMovimentacoesPage() {
           <label className={labelClass} htmlFor="produto">
             Produto
           </label>
-          <select
+          <SearchableSelect
             id="produto"
             value={filtros.produtoId}
-            onChange={(e) => setFiltros({ ...filtros, produtoId: e.target.value })}
-            className={inputClass}
-          >
-            <option value="">Todos</option>
-            {produtos?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
-          </select>
+            onChange={(id) => setFiltros({ ...filtros, produtoId: id })}
+            options={produtos ?? []}
+            getId={(p) => p.id}
+            getLabel={(p) => p.nome}
+            placeholder="Todos"
+            emptyMessage="Nenhum produto encontrado."
+          />
         </div>
 
         <div>
