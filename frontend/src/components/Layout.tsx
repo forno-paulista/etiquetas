@@ -18,6 +18,7 @@ interface NavLink {
 const LINKS: NavLink[] = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/recebimento', label: 'Recebimento' },
+  { to: '/lotes', label: 'Consulta de Lote' },
   { to: '/producao', label: 'Produção' },
   { to: '/transferencias/enviar', label: 'Enviar' },
   { to: '/transferencias/receber', label: 'Receber' },
@@ -28,6 +29,7 @@ const LINKS: NavLink[] = [
   { to: '/admin/produtos', label: 'Produtos', apenasAdmin: true },
   { to: '/admin/grupos', label: 'Grupos', apenasAdmin: true },
   { to: '/admin/locais', label: 'Locais', apenasAdmin: true },
+  { to: '/admin/fornecedores', label: 'Fornecedores', apenasAdmin: true },
   { to: '/admin/motivos-descarte', label: 'Motivos de Descarte', apenasAdmin: true },
 ];
 

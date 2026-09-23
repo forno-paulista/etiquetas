@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { buscarAlertasValidade, type LoteAlerta } from '../lib/api/alertasValidade';
 import { listarLocais } from '../lib/api/locais';
 import { formatarData } from '../lib/formatarData';
@@ -81,21 +82,26 @@ export function DashboardPage() {
             ) : (
               <ul className="divide-y divide-neutral-100">
                 {itensDoBucket.map((item) => (
-                  <li key={item.loteId} className="flex items-center justify-between px-4 py-3 text-sm">
-                    <div>
-                      <div className="font-medium text-neutral-900">{item.produtoNome}</div>
-                      <div className="text-neutral-500">
-                        Lote {item.codigoLote} · {item.localNome}
+                  <li key={item.loteId}>
+                    <Link
+                      to={`/lotes/${item.loteId}`}
+                      className="flex items-center justify-between px-4 py-3 text-sm hover:bg-neutral-50"
+                    >
+                      <div>
+                        <div className="font-medium text-neutral-900">{item.produtoNome}</div>
+                        <div className="text-neutral-500">
+                          Lote {item.codigoLote} · {item.localNome}
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-neutral-900">
-                        {item.quantidadeAtual} {item.unidadeMedida}
+                      <div className="text-right">
+                        <div className="text-neutral-900">
+                          {item.quantidadeAtual} {item.unidadeMedida}
+                        </div>
+                        <div className="text-neutral-500">
+                          {formatarData(item.dataValidade)}
+                        </div>
                       </div>
-                      <div className="text-neutral-500">
-                        {formatarData(item.dataValidade)}
-                      </div>
-                    </div>
+                    </Link>
                   </li>
                 ))}
               </ul>

@@ -2,16 +2,19 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
+import { FornecedoresPage } from './pages/admin/FornecedoresPage';
 import { GruposPage } from './pages/admin/GruposPage';
 import { LocaisPage } from './pages/admin/LocaisPage';
 import { MotivosDescartePage } from './pages/admin/MotivosDescartePage';
 import { ProdutosPage } from './pages/admin/ProdutosPage';
 import { AjustesPendentesPage } from './pages/AjustesPendentesPage';
+import { ConsultaLotePage } from './pages/ConsultaLotePage';
 import { ConsumoPage } from './pages/ConsumoPage';
 import { ContagemPage } from './pages/ContagemPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DescartePage } from './pages/DescartePage';
 import { LoginPage } from './pages/LoginPage';
+import { LoteDetalhePage } from './pages/LoteDetalhePage';
 import { LotePage } from './pages/LotePage';
 import { ProducaoPage } from './pages/ProducaoPage';
 import { RecebimentoPage } from './pages/RecebimentoPage';
@@ -30,6 +33,26 @@ export function App() {
           <ProtectedRoute>
             <Layout>
               <LotePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/lotes"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ConsultaLotePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/lotes/:id"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <LoteDetalhePage />
             </Layout>
           </ProtectedRoute>
         }
@@ -150,6 +173,16 @@ export function App() {
           <ProtectedRoute papeis={['ADMIN']}>
             <Layout>
               <GruposPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/fornecedores"
+        element={
+          <ProtectedRoute papeis={['ADMIN']}>
+            <Layout>
+              <FornecedoresPage />
             </Layout>
           </ProtectedRoute>
         }
