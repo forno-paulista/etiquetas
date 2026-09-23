@@ -26,11 +26,13 @@ const LINKS: NavLink[] = [
   { to: '/consumo', label: 'Consumo' },
   { to: '/contagem', label: 'Contagem' },
   { to: '/ajustes-pendentes', label: 'Ajustes Pendentes' },
+  { to: '/relatorios/movimentacoes', label: 'Relatório' },
   { to: '/admin/produtos', label: 'Produtos', apenasAdmin: true },
   { to: '/admin/grupos', label: 'Grupos', apenasAdmin: true },
   { to: '/admin/locais', label: 'Locais', apenasAdmin: true },
   { to: '/admin/fornecedores', label: 'Fornecedores', apenasAdmin: true },
   { to: '/admin/motivos-descarte', label: 'Motivos de Descarte', apenasAdmin: true },
+  { to: '/admin/usuarios', label: 'Usuários', apenasAdmin: true },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {

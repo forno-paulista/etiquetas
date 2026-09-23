@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import type { ResetSenhaDto } from './dto/reset-senha.dto.js';
 import type { UpdateUsuarioDto } from './dto/update-usuario.dto.js';
 import type { UsuarioResponseDto } from './dto/usuario-response.dto.js';
 
@@ -99,6 +100,17 @@ export class UsuariosService {
       });
     });
 
+    return paraResponseDto(usuario);
+  }
+
+  async resetarSenha(id: string, dto: ResetSenhaDto): Promise<UsuarioResponseDto> {
+    await this.findOne(id);
+    const senhaHash = await argon2.hash(dto.senha);
+    const usuario = await this.prisma.usuario.update({
+      where: { id },
+      data: { senhaHash },
+      select: usuarioSelect,
+    });
     return paraResponseDto(usuario);
   }
 }

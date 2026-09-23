@@ -7,6 +7,7 @@ import { GruposPage } from './pages/admin/GruposPage';
 import { LocaisPage } from './pages/admin/LocaisPage';
 import { MotivosDescartePage } from './pages/admin/MotivosDescartePage';
 import { ProdutosPage } from './pages/admin/ProdutosPage';
+import { UsuariosPage } from './pages/admin/UsuariosPage';
 import { AjustesPendentesPage } from './pages/AjustesPendentesPage';
 import { ConsultaLotePage } from './pages/ConsultaLotePage';
 import { ConsumoPage } from './pages/ConsumoPage';
@@ -18,6 +19,7 @@ import { LoteDetalhePage } from './pages/LoteDetalhePage';
 import { LotePage } from './pages/LotePage';
 import { ProducaoPage } from './pages/ProducaoPage';
 import { RecebimentoPage } from './pages/RecebimentoPage';
+import { RelatorioMovimentacoesPage } from './pages/RelatorioMovimentacoesPage';
 import { TransferenciaEnviarPage } from './pages/TransferenciaEnviarPage';
 import { TransferenciaReceberPage } from './pages/TransferenciaReceberPage';
 
@@ -138,6 +140,16 @@ export function App() {
         }
       />
       <Route
+        path="/relatorios/movimentacoes"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <RelatorioMovimentacoesPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/ajustes-pendentes"
         element={
           <ProtectedRoute>
@@ -193,6 +205,16 @@ export function App() {
           <ProtectedRoute papeis={['ADMIN']}>
             <Layout>
               <MotivosDescartePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/usuarios"
+        element={
+          <ProtectedRoute papeis={['ADMIN']}>
+            <Layout>
+              <UsuariosPage />
             </Layout>
           </ProtectedRoute>
         }

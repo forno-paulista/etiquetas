@@ -20,6 +20,7 @@ import { MotivosDescarteModule } from './motivos-descarte/motivos-descarte.modul
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ProducaoModule } from './producao/producao.module.js';
 import { ProdutosModule } from './produtos/produtos.module.js';
+import { RelatoriosModule } from './relatorios/relatorios.module.js';
 import { TransferenciasModule } from './transferencias/transferencias.module.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
 
@@ -48,6 +49,7 @@ import { UsuariosModule } from './usuarios/usuarios.module.js';
     AjustesPendentesModule,
     ContagemModule,
     AlertasValidadeModule,
+    RelatoriosModule,
   ],
   controllers: [AppController],
   providers: [
