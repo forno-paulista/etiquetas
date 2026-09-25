@@ -1,7 +1,7 @@
 import { apiClient } from '../apiClient';
 import type { UnidadeMedida } from './produtos';
 
-export type StatusAjusteExterno = 'PENDENTE' | 'ENVIADO_FILA' | 'AJUSTADO_NO_ERP' | 'NAO_APLICAVEL';
+export type StatusAjusteExterno = 'PENDENTE' | 'ENVIADO_FILA' | 'AJUSTADO_EXTERNAMENTE' | 'NAO_APLICAVEL';
 
 export interface CreateDescarteInput {
   loteId: string;

@@ -305,10 +305,14 @@ model MotivoDescarte {
   descartes Descarte[]
 }
 
+// Nomeado do ponto de vista do domínio (um ajuste de estoque foi
+// reconciliado fora deste sistema), sem amarrar o nome ao Saipos/Varejo
+// Fácil/ERP específico — o domínio de rastreabilidade não conhece
+// integrações externas, só sabe que existe uma reconciliação pendente.
 enum StatusAjusteExterno {
   PENDENTE
   ENVIADO_FILA
-  AJUSTADO_NO_ERP
+  AJUSTADO_EXTERNAMENTE
   NAO_APLICAVEL
 }
 

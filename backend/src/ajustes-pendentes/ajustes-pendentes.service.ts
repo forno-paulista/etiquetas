@@ -45,7 +45,7 @@ export class AjustesPendentesService {
       }),
       this.prisma.descarte.update({
         where: { id: ajuste.descarteId },
-        data: { statusAjusteExterno: StatusAjusteExterno.AJUSTADO_NO_ERP },
+        data: { statusAjusteExterno: StatusAjusteExterno.AJUSTADO_EXTERNAMENTE },
       }),
     ]);
 

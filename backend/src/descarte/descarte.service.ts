@@ -33,12 +33,12 @@ export class DescarteService {
       throw new BadRequestException(`Saldo insuficiente do lote em ${local.nome} para descartar ${dto.quantidade}.`);
     }
 
-    // CD integra com Varejo Fácil (leitura+escrita) — quando o
-    // VarejoFacilStockProvider existir, o ajuste é chamado automaticamente
-    // aqui e o status vira AJUSTADO_NO_ERP direto. Como ainda não está
-    // implementado (falta detalhe real da API, ver CLAUDE.md § 14), fica
-    // PENDENTE pra lançamento manual, igual loja por enquanto.
-    // Loja não tem API de escrita no Saipos — sempre vira fila manual.
+    // O domínio só sabe que CD e loja reconciliam de formas diferentes —
+    // não conhece Saipos/Varejo Fácil/ERP algum (ver seção 8 do CLAUDE.md,
+    // a integração fica isolada atrás de uma porta que ainda não existe).
+    // Hoje os dois casos caem em fila manual; quando a porta de integração
+    // do CD existir, ela decide se confirma na hora (AJUSTADO_EXTERNAMENTE)
+    // ou deixa PENDENTE — essa decisão não pertence a este service.
     const statusInicial =
       local.tipo === TipoLocal.CD ? StatusAjusteExterno.PENDENTE : StatusAjusteExterno.ENVIADO_FILA;
 
