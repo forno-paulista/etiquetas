@@ -1,5 +1,7 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { AuthService } from './auth.service.js';
 import { Public } from './decorators/public.decorator.js';
 import { LoginDto } from './dto/login.dto.js';
@@ -13,9 +15,12 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  // Limite bem mais apertado que o geral da API (300/min) — login é o alvo
+  // óbvio de força bruta, não faz sentido dar a mesma cota de qualquer rota.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login com email e senha' })
-  login(@Body() dto: LoginDto): Promise<TokensDto> {
-    return this.authService.login(dto.email, dto.senha);
+  login(@Body() dto: LoginDto, @Req() req: Request): Promise<TokensDto> {
+    return this.authService.login(dto.email, dto.senha, req.ip);
   }
 
   @Public()

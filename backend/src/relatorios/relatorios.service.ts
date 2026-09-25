@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { PapelUsuario, Prisma } from '@prisma/client';
+import type { JwtPayload } from '../auth/jwt-payload.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { FindMovimentosQueryDto } from './dto/find-movimentos-query.dto.js';
 
@@ -21,11 +22,30 @@ function fimDoDia(dataIso: string): Date {
 export class RelatoriosService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listarMovimentos(query: FindMovimentosQueryDto) {
+  async listarMovimentos(query: FindMovimentosQueryDto, usuario: JwtPayload) {
+    if (
+      usuario.papel !== PapelUsuario.ADMIN &&
+      query.localId &&
+      !usuario.locaisAcesso.includes(query.localId)
+    ) {
+      throw new ForbiddenException('Usuário não tem acesso a este local.');
+    }
+
+    const localFiltro: Prisma.MovimentoLoteWhereInput | undefined = query.localId
+      ? { OR: [{ localOrigemId: query.localId }, { localDestinoId: query.localId }] }
+      : usuario.papel !== PapelUsuario.ADMIN
+        ? {
+            OR: [
+              { localOrigemId: { in: usuario.locaisAcesso } },
+              { localDestinoId: { in: usuario.locaisAcesso } },
+            ],
+          }
+        : undefined;
+
     const where: Prisma.MovimentoLoteWhereInput = {
       ...(query.tipo ? { tipo: query.tipo } : {}),
       ...(query.produtoId ? { lote: { produtoId: query.produtoId } } : {}),
-      ...(query.localId ? { OR: [{ localOrigemId: query.localId }, { localDestinoId: query.localId }] } : {}),
+      ...(localFiltro ?? {}),
       ...(query.dataInicio || query.dataFim
         ? {
             timestamp: {

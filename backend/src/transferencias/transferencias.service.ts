@@ -141,7 +141,32 @@ export class TransferenciasService {
       });
   }
 
-  findAll(filtros: { status?: StatusTransferencia; localDestinoId?: string; localOrigemId?: string }) {
+  findAll(
+    filtros: { status?: StatusTransferencia; localDestinoId?: string; localOrigemId?: string },
+    usuario: JwtPayload,
+  ) {
+    if (usuario.papel !== PapelUsuario.ADMIN) {
+      const localPedidoForaDoAcesso = [filtros.localOrigemId, filtros.localDestinoId].some(
+        (localId) => localId && !usuario.locaisAcesso.includes(localId),
+      );
+      if (localPedidoForaDoAcesso) {
+        throw new ForbiddenException('Usuário não tem acesso a este local.');
+      }
+      if (!filtros.localOrigemId && !filtros.localDestinoId) {
+        return this.prisma.transferencia.findMany({
+          where: {
+            status: filtros.status,
+            OR: [
+              { localOrigemId: { in: usuario.locaisAcesso } },
+              { localDestinoId: { in: usuario.locaisAcesso } },
+            ],
+          },
+          include: transferenciaComRelacoesInclude,
+          orderBy: { criadaEm: 'desc' },
+        });
+      }
+    }
+
     return this.prisma.transferencia.findMany({
       where: filtros,
       include: transferenciaComRelacoesInclude,

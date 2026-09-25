@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PapelUsuario, StatusAjustePendente, StatusAjusteExterno } from '@prisma/client';
 import type { JwtPayload } from '../auth/jwt-payload.js';
+import { localIdsPermitidos } from '../common/local-scope.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { FindAjustesQueryDto } from './dto/find-ajustes-query.dto.js';
 
@@ -14,9 +15,13 @@ const ajusteComRelacoesInclude = {
 export class AjustesPendentesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(filtros: FindAjustesQueryDto) {
+  findAll(filtros: FindAjustesQueryDto, usuario: JwtPayload) {
+    const localIds = localIdsPermitidos(usuario, filtros.localId);
     return this.prisma.ajustePendente.findMany({
-      where: filtros,
+      where: {
+        status: filtros.status,
+        ...(localIds ? { localId: { in: localIds } } : {}),
+      },
       include: ajusteComRelacoesInclude,
       orderBy: { data: 'asc' },
     });

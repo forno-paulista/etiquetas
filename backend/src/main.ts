@@ -8,7 +8,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(helmet());
-  app.enableCors();
+  // Sem allowlist, enableCors() reflete qualquer origem (origin: true por
+  // padrão) — CORS_ORIGIN restringe a quem realmente serve o frontend.
+  const origensPermitidas = (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
+    .split(',')
+    .map((origem) => origem.trim());
+  app.enableCors({ origin: origensPermitidas });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

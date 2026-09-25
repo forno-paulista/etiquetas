@@ -13,8 +13,8 @@ export class AjustesPendentesController {
 
   @Get()
   @ApiOperation({ summary: 'Lista a fila de ajustes pendentes (descartes em loja que precisam ser lançados manualmente no Saipos)' })
-  findAll(@Query() query: FindAjustesQueryDto) {
-    return this.ajustesPendentesService.findAll(query);
+  findAll(@Query() query: FindAjustesQueryDto, @CurrentUser() usuario: JwtPayload) {
+    return this.ajustesPendentesService.findAll(query, usuario);
   }
 
   @Patch(':id/marcar-lancado')

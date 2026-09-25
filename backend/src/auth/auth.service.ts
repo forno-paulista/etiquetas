@@ -14,29 +14,59 @@ interface Tokens {
 
 @Injectable()
 export class AuthService {
+  // Hash fictício verificado quando o email não existe — sem isso, a
+  // resposta pra "email não existe" volta muito mais rápido que pra "senha
+  // errada" (pula o argon2.verify inteiro), o que dá pra um atacante
+  // descobrir por tempo de resposta quais emails têm conta. Calculado uma
+  // vez por processo, não a cada tentativa.
+  private readonly hashFicticio = argon2.hash(randomBytes(32).toString('hex'));
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
 
-  async login(email: string, senha: string): Promise<Tokens> {
+  async login(email: string, senha: string, ip?: string): Promise<Tokens> {
     const usuario = await this.prisma.usuario.findUnique({
       where: { email },
       include: { locaisAcesso: true },
     });
 
-    if (!usuario || !usuario.ativo) {
+    const senhaValida = await argon2
+      .verify(usuario?.senhaHash ?? (await this.hashFicticio), senha)
+      .catch(() => false);
+
+    if (!usuario || !usuario.ativo || !senhaValida) {
+      await this.registrarAuditoria(usuario?.id, 'LOGIN_FALHOU', { email, ip });
       throw new UnauthorizedException('Credenciais inválidas.');
     }
 
-    const senhaValida = await argon2.verify(usuario.senhaHash, senha);
-    if (!senhaValida) {
-      throw new UnauthorizedException('Credenciais inválidas.');
-    }
+    await this.registrarAuditoria(usuario.id, 'LOGIN_SUCESSO', { email, ip });
 
     const locaisAcesso = usuario.locaisAcesso.map((ul) => ul.localId);
     return this.emitirTokens(usuario, locaisAcesso);
+  }
+
+  // Nunca loga a senha em si — só o suficiente pra investigar um padrão
+  // de força bruta depois (seção 9 do OWASP Top 10: logging insuficiente).
+  private async registrarAuditoria(
+    usuarioId: string | undefined,
+    acao: 'LOGIN_FALHOU' | 'LOGIN_SUCESSO',
+    detalhes: { email: string; ip?: string },
+  ): Promise<void> {
+    // Nunca deixa uma falha ao gravar o log derrubar o login em si.
+    await this.prisma.auditoria
+      .create({
+        data: {
+          usuarioId,
+          acao,
+          entidade: 'Usuario',
+          entidadeId: usuarioId,
+          valoresDepois: detalhes,
+        },
+      })
+      .catch(() => undefined);
   }
 
   async refresh(refreshTokenPlano: string): Promise<Tokens> {

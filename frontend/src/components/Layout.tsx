@@ -86,6 +86,10 @@ interface NavCategoria {
   icon: (p: SVGProps<SVGSVGElement>) => ReactNode;
   items: NavItem[];
   apenasAdmin?: boolean;
+  // Backend restringe GET /relatorios/movimentos a Admin/Gestor CD/Gestor
+  // Loja (seção 12 do CLAUDE.md: "Operador: sem relatórios") — sem isso o
+  // Operador via o link e caía num 403.
+  ocultarDeOperador?: boolean;
 }
 
 const CATEGORIAS: NavCategoria[] = [
@@ -120,6 +124,7 @@ const CATEGORIAS: NavCategoria[] = [
   {
     label: 'Relatórios',
     icon: IconeRelatorios,
+    ocultarDeOperador: true,
     items: [{ to: '/relatorios/movimentacoes', label: 'Movimentações' }],
   },
   {
@@ -158,7 +163,11 @@ export function Layout({ children }: { children: ReactNode }) {
     }
   }, [colapsado]);
 
-  const categoriasVisiveis = CATEGORIAS.filter((cat) => !cat.apenasAdmin || usuario?.papel === 'ADMIN');
+  const categoriasVisiveis = CATEGORIAS.filter(
+    (cat) =>
+      (!cat.apenasAdmin || usuario?.papel === 'ADMIN') &&
+      (!cat.ocultarDeOperador || usuario?.papel !== 'OPERADOR'),
+  );
 
   return (
     <div className="flex h-screen flex-col bg-neutral-50">

@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Lote, Prisma, TipoMovimentoLote } from '@prisma/client';
+import type { JwtPayload } from '../auth/jwt-payload.js';
 import { gerarCodigoLotePadrao } from '../common/codigo-lote.util.js';
+import { localIdsPermitidos } from '../common/local-scope.util.js';
 import { resolverDataValidade } from '../common/validade.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateLoteDto } from './dto/create-lote.dto.js';
@@ -87,9 +89,10 @@ export class LotesService {
   // não expõe histórico de movimentos (isso é GET /lotes/:id), só o
   // necessário pra montar a lista/seletor. Ordenado por validade (FEFO é
   // recomendação de UI, regra 5 do CLAUDE.md, não uma trava).
-  async findAll(query: FindLotesQueryDto) {
+  async findAll(query: FindLotesQueryDto, usuario: JwtPayload) {
+    const localIds = localIdsPermitidos(usuario, query.localId);
     const saldoWhere: Prisma.SaldoLoteWhereInput = {
-      ...(query.localId ? { localId: query.localId } : {}),
+      ...(localIds ? { localId: { in: localIds } } : {}),
       ...(query.comSaldo === false ? {} : { quantidadeAtual: { gt: 0 } }),
     };
 

@@ -33,8 +33,8 @@ export class TransferenciasController {
 
   @Get()
   @ApiOperation({ summary: 'Lista transferências, com filtros por status/local' })
-  findAll(@Query() query: FindTransferenciasQueryDto) {
-    return this.transferenciasService.findAll(query);
+  findAll(@Query() query: FindTransferenciasQueryDto, @CurrentUser() usuario: JwtPayload) {
+    return this.transferenciasService.findAll(query, usuario);
   }
 
   @Get(':id')

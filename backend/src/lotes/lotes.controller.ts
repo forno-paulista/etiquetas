@@ -25,8 +25,8 @@ export class LotesController {
   @ApiOperation({
     summary: 'Lista lotes com saldo, pra escolher em Transferência/Produção/Descarte/Consumo (ordenado por validade — FEFO)',
   })
-  findAll(@Query() query: FindLotesQueryDto) {
-    return this.lotesService.findAll(query);
+  findAll(@Query() query: FindLotesQueryDto, @CurrentUser() usuario: JwtPayload) {
+    return this.lotesService.findAll(query, usuario);
   }
 
   @Get('qr/:qrCodeId')

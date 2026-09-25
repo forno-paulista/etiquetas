@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { StatusAjustePendente, StatusAjusteExterno, TipoLocal, TipoMovimentoLote } from '@prisma/client';
+import type { JwtPayload } from '../auth/jwt-payload.js';
+import { localIdsPermitidos } from '../common/local-scope.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateDescarteDto } from './dto/create-descarte.dto.js';
+import type { FindDescartesQueryDto } from './dto/find-descartes-query.dto.js';
 
 const descarteComRelacoesInclude = {
   lote: { include: { produto: true } },
@@ -97,9 +100,13 @@ export class DescarteService {
     return descarte;
   }
 
-  findAll(filtros: { localId?: string; motivoId?: string }) {
+  findAll(filtros: FindDescartesQueryDto, usuario: JwtPayload) {
+    const localIds = localIdsPermitidos(usuario, filtros.localId);
     return this.prisma.descarte.findMany({
-      where: filtros,
+      where: {
+        motivoId: filtros.motivoId,
+        ...(localIds ? { localId: { in: localIds } } : {}),
+      },
       include: descarteComRelacoesInclude,
       orderBy: { data: 'desc' },
     });

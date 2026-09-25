@@ -142,7 +142,7 @@ export function App() {
       <Route
         path="/relatorios/movimentacoes"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute papeis={['ADMIN', 'GESTOR_CD', 'GESTOR_LOJA']}>
             <Layout>
               <RelatorioMovimentacoesPage />
             </Layout>

@@ -22,8 +22,8 @@ export class DescarteController {
 
   @Get()
   @ApiOperation({ summary: 'Lista descartes, com filtros por local/motivo' })
-  findAll(@Query() query: FindDescartesQueryDto) {
-    return this.descarteService.findAll(query);
+  findAll(@Query() query: FindDescartesQueryDto, @CurrentUser() usuario: JwtPayload) {
+    return this.descarteService.findAll(query, usuario);
   }
 
   @Get(':id')
