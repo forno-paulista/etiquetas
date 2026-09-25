@@ -27,9 +27,12 @@ export class CreateProducaoDto {
   @IsPositive()
   quantidadeProduzida!: number;
 
-  @ApiProperty({ description: 'Definida manualmente — o sistema não calcula automaticamente (regra 10)' })
+  @ApiPropertyOptional({
+    description: 'Editável manualmente; se omitida, cai pra validadePadraoDias do produto de saída (regra 10)',
+  })
+  @IsOptional()
   @IsISO8601()
-  validadeSaida!: string;
+  validadeSaida?: string;
 
   @ApiPropertyOptional({ description: 'Se omitido, usa a data de hoje (AAAA-MM-DD)' })
   @IsOptional()

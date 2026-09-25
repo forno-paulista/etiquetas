@@ -1,8 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-// Visualização pública do QR Code (sem login) — seção 13 do CLAUDE.md:
-// só o básico, nunca o histórico completo de movimentos/locais.
-export class LotePublicoResponseDto {
+// Visualização resumida de um lote via QR Code (autenticada — decisão
+// revertida de "pública sem login", seção 13 do CLAUDE.md) — só o básico,
+// não o histórico completo de movimentos/locais (isso é GET /lotes/:id).
+export class LoteResumoResponseDto {
   @ApiProperty()
   produtoNome!: string;
 

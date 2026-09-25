@@ -69,10 +69,10 @@ O QR Code carrega **apenas um identificador** (URL curta apontando para o lote n
 7. Descarte sempre exige: lote, quantidade, motivo, local, usuário responsável — nunca solto sem vínculo a um lote.
 8. Divergências (transferência ou contagem física) **nunca são corrigidas automaticamente** — sempre viram um evento visível para revisão humana.
 9. Produção pode consumir **mais de um lote de origem** (suporte a N:N desde o início, mesmo que hoje normalmente seja 1 lote por produção).
-10. Validade do produto porcionado (saída de uma Produção) é **definida manualmente pelo usuário**, sem cálculo automático — o sistema apenas exibe a validade da matéria-prima como referência.
+10. Validade (de Recebimento ou da saída de uma Produção) é **sempre editável manualmente** — mas se o usuário não informar, o sistema calcula sozinho a partir da `validadePadraoDias` cadastrada no produto (ex.: queijo = 7 dias por padrão), contada a partir da data de recebimento/fabricação. Sem informar e sem padrão cadastrado, o sistema exige o valor (não adivinha do nada). Objetivo: reduzir digitação repetitiva no dia a dia da cozinha, sem tirar a possibilidade de ajuste manual caso a caso.
 11. Consumo de matéria-prima em uma Produção pode ter **origem desconhecida** (ex.: sobra antiga, item que não passou pelo fluxo de recebimento do sistema) — nesse caso, `lote_origem_id` é nulo, mas `origem_desconhecida = true` e uma descrição textual são obrigatórias. Nunca um consumo sem explicação.
 12. A promessa de rastreabilidade do sistema é: **"completa para tudo que entrou pelo fluxo de recebimento do sistema, com gaps explicitamente marcados quando a origem é desconhecida"** — não uma promessa de rastreabilidade absoluta.
-13. **Empacotamento físico (ex.: um "sacão" com N porcionados) não é uma entidade própria no sistema** — é reimpressão da etiqueta/QR do mesmo `Lote`, com a quantidade daquele pacote específico anotada na etiqueta impressa (ex.: "10 un / 700g" no sacão vs. "1 un / 70g" em cada porcionado individual). Consistente com o rastreio agregado por lote (regra 4) — o sistema não precisa saber qual unidade física específica é qual, só a quantidade total do lote.
+13. **Empacotamento físico (ex.: um "sacão" com N porcionados) não é uma entidade própria no sistema** — é reimpressão da etiqueta/QR do mesmo `Lote`, com a quantidade daquele pacote específico anotada na etiqueta impressa (ex.: "10 un / 700g" no sacão vs. "1 un / 70g" em cada porcionado individual). Consistente com o rastreio agregado por lote (regra 4) — o sistema não precisa saber qual unidade física específica é qual, só a quantidade total do lote. **"Produto solto" (item avulso, sem agrupamento) já funciona do mesmo jeito, sem nada especial** — é só um `Lote` com `quantidade` pequena (inclusive 1); nunca existiu uma trava de "precisa ser um grupo/container" no modelo.
 14. Consumo/uso operacional de um lote na loja (ex.: retirar um porcionado da câmara fria pra usar) gera `MovimentoLote` tipo `CONSUMO` — mesma mecânica de tela do `Descarte` (buscar/escanear lote, informar quantidade, registrar), mas **não é perda**: não exige motivo, não aciona `VarejoFacilStockProvider` nem `AjustePendente`. **Não precisa ser lançado no momento exato do uso** — o registro guarda só lote + quantidade + quem lançou + quando foi *registrado* (não quando foi fisicamente usado), então o lançamento pode ser em lote no fim do turno/dia, sem parar a operação pra escanear cada unidade retirada. Existe separado da baixa automática de venda do Saipos (que já não é rastreada por lote, ver seção 9) — é um registro manual complementar, não uma tentativa de sincronizar com o Saipos.
 
 ## 6. Fluxos principais
@@ -114,10 +114,10 @@ Selecionar lote(s) e quantidade a enviar (sistema sugere ordem FEFO)
 
 ### Alertas de validade
 ```
-Job periódico (ex.: diário) varre lotes ativos
-→ Calcula dias até vencimento
-→ Classifica em faixas configuráveis (ex.: 7 dias, 3 dias, hoje, vencido)
-→ Popula painel por local
+GET /alertas-validade (calculado na hora da consulta, não um job/tabela) →
+→ Filtra lotes com saldo > 0 (opcionalmente por local)
+→ Classifica em: vencidos, vence hoje, vence amanhã, próximos N dias (padrão 7, configurável)
+→ Painel por local (tela "Dashboard", seção 11 — estilo Suflex: contadores por faixa)
 ```
 
 ### Descarte
@@ -163,6 +163,7 @@ Grupo (categoria de produto, ex.: "Frios" > "Laticínios" — 2 níveis: grupo e
 Produto
   ├─ unidade_medida
   ├─ grupo_id (nullable)
+  ├─ validade_padrao_dias (nullable — regra 10, preenche a validade quando não informada)
   └─ MapeamentoProdutoExterno (produto_local_id ↔ produto_saipos_id / produto_varejofacil_id)
 
 Fornecedor
@@ -170,7 +171,7 @@ Fornecedor
 Lote
   ├─ produto_id
   ├─ fornecedor_id (nullable)
-  ├─ codigo_lote
+  ├─ codigo_lote (opcional, texto livre, sem exigência de unicidade — ver § 18.5, item 8)
   ├─ data_fabricacao (nullable)
   ├─ data_validade
   ├─ qr_code_id (chave pública usada no QR — não muda mesmo que a quantidade varie)
@@ -300,10 +301,12 @@ Nenhuma divergência é absorvida silenciosamente.
 | Gestor Loja | Sua loja | Recebimento local, produção, confirmar transferência, descarte, gerenciar fila de ajustes Saipos da própria loja |
 | Operador | Sua loja/CD | Recebimento, descarte, confirmar transferência — sem relatórios/config |
 
+**Leitura de cadastros (produtos, locais, fornecedores, grupos, motivos de descarte) é liberada pra qualquer papel autenticado** — todo mundo precisa consultar essas listas pra preencher os formulários de Recebimento/Descarte/etc. Só criar/editar cadastro continua exclusivo de Admin.
+
 ## 13. QR Code
 
 - Formato: URL curta (`https://.../l/{codigo_curto}`), nunca JSON embutido.
-- Ao escanear, abre página web; visualização básica sem login, ações sensíveis (descarte, confirmação) exigem autenticação.
+- **Decisão revertida (2026-09-22): a consulta por QR Code exige login, sempre — não existe mais visualização pública/sem autenticação.** O plano original (visualização básica sem login, só ações sensíveis autenticadas) foi trocado a pedido do usuário: é uso interno, não deve ser acessível por qualquer um que ache uma etiqueta. `GET /lotes/qr/:qrCodeId` deixou de ser `@Public()`; o rate limiting mais apertado que existia especificamente por ser endpoint público também foi removido (o limite geral da API já cobre).
 - QR Code gerado uma vez na criação do lote, não muda mesmo que a quantidade varie.
 - Etiqueta impressa mostra: nome do produto, lote, validade, quantidade original, QR Code — é uma "foto do momento", a fonte de verdade é sempre o sistema.
 
@@ -331,7 +334,7 @@ Auth:      JWT (expiração curta + refresh token)
 
 Segurança: HTTPS obrigatório em produção
            Checagem de papel + local sempre no backend (nunca confiar só no frontend)
-           Rate limiting em endpoints públicos de leitura de QR Code
+           Rate limiting geral na API (não há mais endpoint público de QR — seção 13)
            Logs de auditoria gravados em banco (não só arquivo)
 
 Infra:     Docker (backend + Postgres em containers)
@@ -486,6 +489,16 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
    implementação inicial via navegador (`BrowserPrintProvider`). Hardware
    final (impressora térmica própria vs. continuar com a Suflex vs.
    impressora comum) ainda em aberto — seção 17.
+8. **Código do lote** (decisão de 2026-09-22, a partir de dúvida do
+   usuário: "se não tiver, com que cria? gera um genérico?"): confirmado
+   como **texto livre e opcional, sem exigência de unicidade** — segue o
+   precedente real do Suflex (§ 18.4: lá também é campo livre, "quem
+   rastreia de verdade é o QR Code individual da etiqueta, não um código
+   de lote digitado"). Se o usuário não informar, o backend gera um código
+   automático (`AUTO-YYMMDD-XXXX`) só pra a etiqueta não ficar com "Lote "
+   em branco — não é uma tentativa de identificador único, e duas etiquetas
+   podem legitimamente ter o mesmo `codigoLote` sem problema, porque quem
+   identifica o lote de fato é o `qrCodeId`.
 
 ---
 
@@ -493,18 +506,29 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
 
 - `backend/`: API NestJS + Prisma (schema de dados da seção 7 já modelado em `backend/prisma/schema.prisma`), com `Dockerfile` multi-stage (build → runtime) para rodar containerizado.
 - `backend/src/auth/`: autenticação implementada — JWT de acesso curto + refresh token com rotação (tabela `RefreshToken`), senha com argon2, guards globais (`JwtAuthGuard` + `RolesGuard` via `APP_GUARD` — toda rota exige autenticação por padrão, endpoints públicos usam `@Public()`) e `LocalAccessGuard` por rota pra checar acesso por local (seção 12). `prisma/seed.ts` cria o usuário Admin inicial (`npm run db:seed`).
-- `backend/src/usuarios/`: CRUD de usuários (criar, listar, buscar, atualizar papel/status/locais), restrito a `ADMIN` via `@Roles`. É como se cria login pra alguém além do Admin do seed.
+- `backend/src/usuarios/`: CRUD de usuários (criar, listar, buscar, atualizar papel/status/locais), restrito a `ADMIN` via `@Roles`. É como se cria login pra alguém além do Admin do seed. `PATCH /usuarios/:id/senha` redefine a senha (não existia forma de recuperar acesso de alguém que esqueceu a senha).
+- `backend/src/relatorios/`: `GET /relatorios/movimentos?produtoId=&localId=&tipo=&dataInicio=&dataFim=` — Relatório de Movimentações (seção 11), dado bruto navegável, limitado a 300 resultados por consulta (sem paginação, não é prioridade no MVP). `localId` filtra por origem OU destino. `dataFim` de um `<input type="date">` vira fim do dia (23:59:59.999), não meia-noite — mesma armadilha de fuso do `formatarData` no frontend.
 - Cadastros base implementados, todos restritos a `ADMIN`: `backend/src/locais/`, `backend/src/grupos/` (hierarquia de 2 níveis reforçada no service — tentar criar um 3º nível dá 400), `backend/src/fornecedores/`, `backend/src/motivos-descarte/`, `backend/src/produtos/` (com `grupoId` opcional).
-- `backend/src/lotes/`: primeiro módulo de domínio de verdade. `POST /lotes` é o Recebimento (cria Lote + SaldoLote + MovimentoLote ENTRADA numa transação, protegido por `LocalAccessGuard`); `GET /lotes/:id` é a consulta autenticada com histórico completo; `GET /lotes/qr/:qrCodeId` é a consulta pública via QR (`@Public()`, dados básicos só — seção 13).
+- `backend/src/lotes/`: primeiro módulo de domínio de verdade. `POST /lotes` é o Recebimento (cria Lote + SaldoLote + MovimentoLote ENTRADA numa transação, protegido por `LocalAccessGuard`; `codigoLote` é opcional — se omitido, gera um automático via `common/codigo-lote.util.ts`, seção 18.5 item 8; validade padrão, quando não informada, conta a partir da `dataFabricacao` se ela foi preenchida, senão da data de recebimento, regra 10); `GET /lotes/:id` é a consulta autenticada com histórico completo; `GET /lotes/qr/:qrCodeId` é a consulta resumida via QR, também autenticada (dados básicos só — seção 13, não é mais público).
 - `backend/src/producao/`: `POST /producao` consome N lotes de origem (conhecidos e/ou de origem desconhecida — regra 11) e gera um novo `Lote` + `MovimentoLote(PRODUCAO_ENTRADA/PRODUCAO_CONSUMO)`, tudo numa transação. Valida saldo suficiente de cada lote de origem antes de mexer em qualquer coisa.
 - `backend/src/transferencias/`: `POST /transferencias` envia (decrementa saldo na origem na hora, status `EM_TRANSITO`); `PATCH /transferencias/:id/confirmar` recebe (incrementa saldo no destino pela quantidade *confirmada*, não a enviada — vira `CONCLUIDA` ou `DIVERGENTE`, nunca corrigido sozinho, regra 8). `LocalAccessGuard` foi generalizado pra reconhecer `localOrigemId`/`localDestinoId`, não só `localId`.
+- `backend/src/lotes/`: `GET /lotes?produtoId=&localId=&comSaldo=` lista lotes com saldo (default só saldo > 0), ordenado por validade — é o que alimenta o seletor de lote em Transferência/Produção/Descarte/Consumo, já que não existia forma de buscar lote a não ser por `id` ou QR Code.
 - `backend/src/consumo/`: `POST /consumo` registra baixa manual (regra 14) — só `MovimentoLote(CONSUMO)`, não tem tabela própria.
 - `backend/src/descarte/` + `backend/src/ajustes-pendentes/`: `POST /descartes` decide `statusAjusteExterno` pelo tipo do local — CD vira `PENDENTE` (`VarejoFacilStockProvider` ainda não existe, ver seção 8), Loja vira `ENVIADO_FILA` + cria `AjustePendente`. `PATCH /ajustes-pendentes/:id/marcar-lancado` fecha o ciclo (fila da seção 11) e propaga `AJUSTADO_NO_ERP` de volta pro Descarte.
 - `backend/src/contagem/`: `POST /contagem` só gera `MovimentoLote(AJUSTE_CONTAGEM)` se a contagem divergir do saldo — e exige `observacao` (campo novo em `MovimentoLote`, não existia antes) quando diverge, regra/seção 10. Sem divergência, não cria nada.
-- `frontend/`: ainda não iniciado — próxima etapa após a API e o modelo de dados estarem estáveis.
-- `docker-compose.yml`: sobe Postgres + backend juntos. É o mesmo compose usado local e em produção (VPS/VM na nuvem) — só muda o `.env`. Ver seção "Deploy" no `README.md`.
+- `frontend/`: iniciado — Vite + React + TypeScript, Tailwind, React Router, TanStack Query. Capacitor ainda não entrou (só quando for empacotar como app nativo de verdade, seção 15 — a PWA não precisa disso pra existir).
+  - `src/lib/apiClient.ts`: instância do axios com refresh automático de token no 401 (fila única de refresh, evita disparar vários em paralelo).
+  - `src/context/AuthContext.tsx` + `ProtectedRoute`: sessão guardada no `localStorage` (trade-off consciente — o backend devolve os tokens no corpo, não em cookie httpOnly).
+  - Telas prontas: Login, Dashboard (`/alertas-validade`, filtro por local, cards clicáveis, cada item da lista linka pra `/lotes/:id`), Produtos (`/admin/produtos`, CRUD com edição completa — nome, unidade, grupo, validade padrão —, só Admin, dropdown de grupo mostra subgrupos indentados), Grupos (`/admin/grupos`, CRUD de 2 níveis — grupo e subgrupo —, só Admin), Locais (`/admin/locais`, CRUD simples — nome/tipo —, só Admin), Fornecedores (`/admin/fornecedores`, CRUD simples — nome/CNPJ —, só Admin), Motivos de Descarte (`/admin/motivos-descarte`, CRUD simples, só Admin), Usuários (`/admin/usuarios`, cria login com papel + locais de acesso, edita, ativa/desativa, redefine senha inline, só Admin), Recebimento (`/recebimento`, gera o `Lote` + mostra a etiqueta com QR Code renderizado no cliente via lib `qrcode`; label de quantidade mostra a unidade de medida do produto selecionado; etiqueta mostra a quantidade recebida), Consulta de Lote — busca (`/lotes`, filtra por produto/local via `GET /lotes`) e detalhe (`/lotes/:id`, dados do lote + saldo por local + histórico completo de movimentos, é o `GET /lotes/:id`), Produção/Porcionamento (`/producao`, 1+ linhas de consumo — cada uma lote conhecido via `GET /lotes` ou origem desconhecida com descrição, regra 9/11), Transferência — Enviar (`/transferencias/enviar`, seleciona local origem/destino/produto/lote via `GET /lotes`, lote já vem ordenado FEFO) e Receber (`/transferencias/receber`, fila de `EM_TRANSITO` pros locais do usuário, confirma quantidade e mostra CONCLUIDA/DIVERGENTE — regra 8), Descarte (`/descarte`, scan/seleção de lote + motivo, mostra aviso de fila pendente quando é loja), Consumo (`/consumo`, mesma mecânica do Descarte sem motivo — mantém local/produto selecionado após cada registro, pensado pra lançar vários de uma vez no fim do turno, regra 14), Contagem (`/contagem`, compara a quantidade contada com o saldo do sistema no próprio formulário — só pede observação quando diverge, antes de submeter), Fila de Ajustes Pendentes (`/ajustes-pendentes`, lista `PENDENTE` dos locais do usuário, botão marca como lançado no Saipos), Relatório de Movimentações (`/relatorios/movimentacoes`, filtro por produto/local/tipo/período sobre `GET /relatorios/movimentos`, cada linha linka pro lote), Consulta de Lote via QR (`/l/:qrCodeId`, autenticada — é a página pro que o QR code aponta, mostra só o resumo, mas exige login, seção 13). Todas testadas de ponta a ponta no navegador contra o backend real.
+  - `src/lib/formStyles.ts`: classes de formulário centralizadas (o bug do texto invisível em modo escuro veio de inputs sem `bg`/cor de texto explícitos — não repetir isso tela a tela).
+  - `src/components/Layout.tsx`: navegação virou sidebar à esquerda, categorizada (Visão Geral, Estoque, Transferência, Baixas e Ajustes, Relatórios, Administração), com botão hamburguer que expande/retrai (estado persistido em `localStorage`) — a lista de links horizontal parou de caber e ficava difícil de escanear.
+  - `src/components/SearchableSelect.tsx`: combobox com busca (digita e filtra, sem precisar rolar um `<select>` gigante) — usado em todo seletor de **Produto** e **Lote** nas telas operacionais (Recebimento, Produção, Transferência, Descarte, Consumo, Contagem, Consulta de Lote, Relatório). Não tem validação nativa do navegador (não é um `<select required>`) — cada tela guarda isso com uma checagem própria no `handleSubmit`. Local/Motivo/Grupo continuam `<select>` comum — listas pequenas e limitadas, sem o mesmo problema de escala.
+  - Achado ao integrar: os 5 endpoints de cadastro (`locais`, `produtos`, `fornecedores`, `grupos`, `motivos-descarte`) estavam com `GET` restrito a `ADMIN` — corrigido pra liberar leitura a qualquer papel autenticado (só escrita continua Admin-only), porque os formulários de qualquer usuário precisam popular esses dropdowns.
+- `docker-compose.yml`: sobe Postgres + backend juntos. É o mesmo compose usado local e em produção (VPS/VM na nuvem) — só muda o `.env`. Ver seção "Deploy" no `README.md`. Frontend ainda não entrou no compose (roda via `npm run dev` direto por enquanto).
 - `prisma migrate deploy` roda automaticamente no boot do container do backend (`Dockerfile`, `CMD`). Válido para uma única réplica; reavaliar se algum dia escalar horizontalmente.
-- **Todos os módulos de domínio do MVP (seção 4) estão implementados e testados de ponta a ponta** (recebimento, produção, transferência, consumo, descarte, contagem). Falta: `StockProvider` (Saipos/Varejo Fácil — precisa de detalhes reais da API, combinado com o usuário), `LabelPrinterProvider`, rate limiting no endpoint público de QR (seção 15 pede), e todo o frontend.
+- **Todos os módulos de domínio do MVP (seção 4) estão implementados no backend e testados de ponta a ponta** (recebimento, produção, transferência, consumo, descarte, contagem) — **e o frontend agora cobre todas as telas da seção 11, sem exceção**. Falta só o que já estava listado como pendente na seção 17: `StockProvider` (Saipos/Varejo Fácil — precisa de detalhes reais da API, combinado com o usuário) e `LabelPrinterProvider` (hardware de impressão ainda não decidido).
+- Rate limiting implementado (`@nestjs/throttler`): limite geral de 300 req/min por IP em toda a API (seção 15). O limite mais apertado que existia especificamente em `GET /lotes/qr/:qrCodeId` foi removido junto com a decisão de tornar o endpoint autenticado (seção 13) — não fazia mais sentido um limite à parte pra um endpoint que não é mais público.
+- Trabalho a partir daqui é feito na branch `dev` (não em `main`) — PR fica aberto no GitHub até o usuário decidir mergear manualmente.
 
 ## Padrões de documentação
 

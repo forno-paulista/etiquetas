@@ -29,9 +29,13 @@ async function main() {
 
   const senhaHash = await argon2.hash(senhaAdmin);
 
+  // update preenchido de propósito: o seed precisa ser idempotente E
+  // refletir de verdade SEED_ADMIN_SENHA a cada execução — um upsert com
+  // update:{} deixaria a senha antiga presa pra sempre depois da primeira
+  // vez, mesmo mudando a env var (foi exatamente o bug que gerou isso).
   const admin = await prisma.usuario.upsert({
     where: { email: emailAdmin },
-    update: {},
+    update: { senhaHash, papel: PapelUsuario.ADMIN, ativo: true },
     create: {
       email: emailAdmin,
       nome: 'Administrador',

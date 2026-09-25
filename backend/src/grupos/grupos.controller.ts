@@ -6,14 +6,15 @@ import { CreateGrupoDto } from './dto/create-grupo.dto.js';
 import { UpdateGrupoDto } from './dto/update-grupo.dto.js';
 import { GruposService } from './grupos.service.js';
 
+// Leitura liberada pra qualquer usuário autenticado — ver locais.controller.ts.
 @ApiTags('grupos')
 @ApiBearerAuth()
-@Roles(PapelUsuario.ADMIN)
 @Controller('grupos')
 export class GruposController {
   constructor(private readonly gruposService: GruposService) {}
 
   @Post()
+  @Roles(PapelUsuario.ADMIN)
   @ApiOperation({ summary: 'Cria um grupo ou subgrupo de produto' })
   create(@Body() dto: CreateGrupoDto): Promise<Grupo> {
     return this.gruposService.create(dto);
@@ -32,6 +33,7 @@ export class GruposController {
   }
 
   @Patch(':id')
+  @Roles(PapelUsuario.ADMIN)
   @ApiOperation({ summary: 'Atualiza nome, ícone ou status de um grupo' })
   update(@Param('id') id: string, @Body() dto: UpdateGrupoDto): Promise<Grupo> {
     return this.gruposService.update(id, dto);

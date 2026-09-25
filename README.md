@@ -13,7 +13,7 @@ Contexto completo de negócio, regras, modelo de dados e arquitetura: veja
 
 ```
 backend/    API NestJS + Prisma (PostgreSQL)
-frontend/   React + Capacitor (PWA hoje, empacotável como app depois) — ainda não iniciado
+frontend/   React + Vite + TypeScript (PWA hoje, empacotável com Capacitor depois)
 ```
 
 O `backend/` roda tanto direto no host (`npm run start:dev`) quanto
@@ -45,9 +45,12 @@ seed (cria Organização, o Local do CD e um usuário Admin inicial):
 cd backend && npm run db:seed
 ```
 
-O e-mail/senha do Admin saem no log do comando (`SEED_ADMIN_EMAIL` /
-`SEED_ADMIN_SENHA` no `.env` pra customizar) — troque a senha assim que
-acessar pela primeira vez.
+O e-mail/senha do Admin saem no log do comando. Pra customizar, defina
+`SEED_ADMIN_EMAIL` / `SEED_ADMIN_SENHA` especificamente em **`backend/.env`**
+(não no `.env` da raiz, não em `.env.local` — o seed só lê `backend/.env`,
+porque é de dentro de `backend/` que `npm run db:seed` roda). O seed é
+idempotente: rodar de novo com uma senha nova **atualiza** a senha do
+usuário existente (não fica preso na primeira execução).
 
 ### B) Só o Postgres em Docker, backend direto no host (iteração mais rápida)
 
@@ -69,6 +72,19 @@ Com a API no ar, a documentação interativa (Swagger/OpenAPI) fica em
 controllers/DTOs — todo endpoint novo deve ser documentado lá (ver seção
 "Padrões de documentação" no [`CLAUDE.md`](./CLAUDE.md)). Não é exposta
 quando `NODE_ENV=production`.
+
+### Frontend
+
+Com a API já rodando (opção A ou B acima):
+
+```bash
+cd frontend
+cp .env.example .env   # aponta pra API local por padrão
+npm install
+npm run dev
+```
+
+Abre em `http://localhost:5173`. Loga com o usuário criado pelo seed.
 
 ## Deploy em VPS / servidor / VM na nuvem
 
@@ -96,3 +112,7 @@ Pontos que ainda faltam para produção (não implementados ainda):
   `prisma migrate deploy` automático no boot do container deixa de ser
   seguro (duas réplicas subindo ao mesmo tempo podem tentar migrar em
   paralelo) — nesse caso, migration vira um passo separado do deploy.
+- O frontend ainda não está no `docker-compose.yml` nem tem `Dockerfile`
+  próprio — hoje só roda via `npm run dev`. Falta decidir o empacotamento
+  pra produção (build estático servido por nginx/Caddy é o caminho mais
+  simples) quando o frontend estiver mais maduro.

@@ -15,10 +15,14 @@ export class CreateLoteDto {
   @IsString()
   fornecedorId?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description:
+      'Texto livre, sem exigência de unicidade — quem identifica o lote de verdade é o QR Code (qrCodeId), gerado pelo sistema. Se omitido, um código é gerado automaticamente só para preencher a etiqueta.',
+  })
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  codigoLote!: string;
+  codigoLote?: string;
 
   @ApiProperty()
   @IsNumber({ maxDecimalPlaces: 3 })
@@ -30,7 +34,10 @@ export class CreateLoteDto {
   @IsISO8601()
   dataFabricacao?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Se omitida, calculada a partir da validadePadraoDias do produto. Obrigatória se o produto não tiver padrão definido.',
+  })
+  @IsOptional()
   @IsISO8601()
-  dataValidade!: string;
+  dataValidade?: string;
 }

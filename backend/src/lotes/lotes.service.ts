@@ -1,8 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Lote, TipoMovimentoLote } from '@prisma/client';
+import { Lote, Prisma, TipoMovimentoLote } from '@prisma/client';
+import { gerarCodigoLotePadrao } from '../common/codigo-lote.util.js';
+import { resolverDataValidade } from '../common/validade.util.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateLoteDto } from './dto/create-lote.dto.js';
-import type { LotePublicoResponseDto } from './dto/lote-publico-response.dto.js';
+import type { FindLotesQueryDto } from './dto/find-lotes-query.dto.js';
+import type { LoteResumoResponseDto } from './dto/lote-resumo-response.dto.js';
 
 const loteComRelacoesInclude = {
   produto: true,
@@ -37,14 +40,25 @@ export class LotesService {
       }
     }
 
+    const dataRecebimento = new Date();
+    const dataFabricacao = dto.dataFabricacao ? new Date(dto.dataFabricacao) : undefined;
+    // Regra 10 (CLAUDE.md § 5): a validade padrão conta "a partir da data de
+    // recebimento/fabricação" — se a fabricação foi informada, ela é a base
+    // mais correta (o produto pode ter chegado dias depois de fabricado).
+    const dataValidade = resolverDataValidade(
+      dto.dataValidade,
+      dataFabricacao ?? dataRecebimento,
+      produto.validadePadraoDias,
+    );
+
     const loteId = await this.prisma.$transaction(async (tx) => {
       const lote = await tx.lote.create({
         data: {
           produtoId: dto.produtoId,
           fornecedorId: dto.fornecedorId,
-          codigoLote: dto.codigoLote,
-          dataFabricacao: dto.dataFabricacao,
-          dataValidade: dto.dataValidade,
+          codigoLote: dto.codigoLote?.trim() || gerarCodigoLotePadrao(),
+          dataFabricacao,
+          dataValidade,
           createdById: usuarioId,
         },
       });
@@ -69,6 +83,29 @@ export class LotesService {
     return this.findOne(loteId);
   }
 
+  // Lista lotes pra escolher em Transferência/Produção/Descarte/Consumo —
+  // não expõe histórico de movimentos (isso é GET /lotes/:id), só o
+  // necessário pra montar a lista/seletor. Ordenado por validade (FEFO é
+  // recomendação de UI, regra 5 do CLAUDE.md, não uma trava).
+  async findAll(query: FindLotesQueryDto) {
+    const saldoWhere: Prisma.SaldoLoteWhereInput = {
+      ...(query.localId ? { localId: query.localId } : {}),
+      ...(query.comSaldo === false ? {} : { quantidadeAtual: { gt: 0 } }),
+    };
+
+    return this.prisma.lote.findMany({
+      where: {
+        ...(query.produtoId ? { produtoId: query.produtoId } : {}),
+        saldos: { some: saldoWhere },
+      },
+      include: {
+        produto: true,
+        saldos: { where: saldoWhere, include: { local: true } },
+      },
+      orderBy: { dataValidade: 'asc' },
+    });
+  }
+
   async findOne(id: string) {
     const lote = await this.prisma.lote.findUnique({
       where: { id },
@@ -80,7 +117,7 @@ export class LotesService {
     return lote;
   }
 
-  async findByQrCodePublico(qrCodeId: string): Promise<LotePublicoResponseDto> {
+  async findByQrCode(qrCodeId: string): Promise<LoteResumoResponseDto> {
     const lote = await this.prisma.lote.findUnique({
       where: { qrCodeId },
       include: { produto: true, saldos: true },
