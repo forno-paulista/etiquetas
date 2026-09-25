@@ -31,8 +31,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-etiquetas}:${POSTGRES_PASSWORD:-etiquetas}@postgres:5432/${POSTGRES_DB:-etiquetas}?schema=public
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?defina JWT_ACCESS_SECRET no .env}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?defina JWT_REFRESH_SECRET no .env}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3000}
     ports:
       - "${BACKEND_PORT:-3000}:3000"

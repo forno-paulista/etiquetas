@@ -94,8 +94,8 @@ não existe uma versão "de produção" separada do compose:
 ```bash
 git clone <repo> etiquetas && cd etiquetas
 cp .env.example .env
-# edite o .env: troque JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, senha do
-# Postgres e PUBLIC_APP_URL para os valores reais de produção
+# edite o .env: troque JWT_ACCESS_SECRET, senha do Postgres, CORS_ORIGIN
+# e PUBLIC_APP_URL para os valores reais de produção
 docker compose up -d --build
 ```
 
