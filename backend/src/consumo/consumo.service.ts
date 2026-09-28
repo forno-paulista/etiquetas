@@ -1,11 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { TipoMovimentoLote } from '@prisma/client';
+import { EventosDominioService } from '../eventos-dominio/eventos-dominio.service.js';
+import { TIPO_EVENTO } from '../eventos-dominio/tipos.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateConsumoDto } from './dto/create-consumo.dto.js';
 
 @Injectable()
 export class ConsumoService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventos: EventosDominioService,
+  ) {}
 
   async registrar(dto: CreateConsumoDto, usuarioId: string) {
     const local = await this.prisma.local.findUnique({ where: { id: dto.localId } });
@@ -15,6 +20,7 @@ export class ConsumoService {
 
     const saldo = await this.prisma.saldoLote.findUnique({
       where: { loteId_localId: { loteId: dto.loteId, localId: dto.localId } },
+      include: { lote: { include: { produto: true } } },
     });
     if (!saldo || Number(saldo.quantidadeAtual) < dto.quantidade) {
       throw new BadRequestException(`Saldo insuficiente do lote em ${local.nome} para consumir ${dto.quantidade}.`);
@@ -26,7 +32,7 @@ export class ConsumoService {
         data: { quantidadeAtual: { decrement: dto.quantidade } },
       });
 
-      return tx.movimentoLote.create({
+      const movimento = await tx.movimentoLote.create({
         data: {
           loteId: dto.loteId,
           tipo: TipoMovimentoLote.CONSUMO,
@@ -40,6 +46,21 @@ export class ConsumoService {
           usuario: { select: { id: true, nome: true } },
         },
       });
+
+      await this.eventos.registrar(tx, {
+        tipo: TIPO_EVENTO.CONSUMO_REGISTRADO,
+        agregado: 'MovimentoLote',
+        agregadoId: movimento.id,
+        payload: {
+          loteId: dto.loteId,
+          produtoNome: saldo.lote.produto.nome,
+          quantidade: dto.quantidade,
+          localId: dto.localId,
+          localNome: local.nome,
+        },
+      });
+
+      return movimento;
     });
   }
 }

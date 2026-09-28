@@ -471,3 +471,35 @@ model Auditoria {
   @@index([entidade, entidadeId])
   @@index([timestamp])
 }
+
+// ---------------------------------------------------------------------------
+// Eventos de domínio
+// ---------------------------------------------------------------------------
+
+// Log de eventos de domínio, append-only — padrão outbox: cada linha só
+// existe porque foi gravada na MESMA transação que a mudança de estado que
+// ela descreve (nunca depois, separado — um crash no meio perderia o
+// evento pra sempre sem essa garantia). `id` autoincrement é o cursor:
+// um consumidor (interno ou um futuro adaptador externo/StockProvider) lê
+// "tudo com id > último processado", guarda esse cursor por conta própria.
+// Nenhum module de domínio (Lote, Descarte, Transferência, Produção)
+// conhece quem lê esta tabela — é o ponto de extensão da seção 8 do
+// CLAUDE.md, sem precisar tocar no núcleo pra plugar um adaptador novo.
+model EventoDominio {
+  id         Int      @id @default(autoincrement())
+  // Ex.: "lote.recebido", "descarte.registrado" — ver eventos-dominio/tipos.ts.
+  tipo       String
+  // Entidade principal do fato (ex.: "Descarte", "Transferencia") — não é
+  // FK de propósito: o evento tem que sobreviver mesmo se a linha original
+  // for reorganizada/arquivada um dia, é uma cópia imutável do fato.
+  agregado   String
+  agregadoId String
+  // Snapshot do que aconteceu, já com os dados legíveis (nome de produto,
+  // local etc.) — um adaptador externo não deveria precisar voltar no
+  // banco pra montar o evento.
+  payload    Json
+  ocorridoEm DateTime @default(now())
+
+  @@index([tipo])
+  @@index([agregado, agregadoId])
+}

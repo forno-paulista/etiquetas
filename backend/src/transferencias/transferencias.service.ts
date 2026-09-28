@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PapelUsuario, StatusTransferencia, TipoMovimentoLote } from '@prisma/client';
 import type { JwtPayload } from '../auth/jwt-payload.js';
+import { EventosDominioService } from '../eventos-dominio/eventos-dominio.service.js';
+import { TIPO_EVENTO } from '../eventos-dominio/tipos.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ConfirmarTransferenciaDto } from './dto/confirmar-transferencia.dto.js';
 import type { CreateTransferenciaDto } from './dto/create-transferencia.dto.js';
@@ -15,7 +17,10 @@ const transferenciaComRelacoesInclude = {
 
 @Injectable()
 export class TransferenciasService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventos: EventosDominioService,
+  ) {}
 
   async enviar(dto: CreateTransferenciaDto, usuarioId: string) {
     if (dto.localOrigemId === dto.localDestinoId) {
@@ -23,7 +28,7 @@ export class TransferenciasService {
     }
 
     const [lote, localOrigem, localDestino] = await Promise.all([
-      this.prisma.lote.findUnique({ where: { id: dto.loteId } }),
+      this.prisma.lote.findUnique({ where: { id: dto.loteId }, include: { produto: true } }),
       this.prisma.local.findUnique({ where: { id: dto.localOrigemId } }),
       this.prisma.local.findUnique({ where: { id: dto.localDestinoId } }),
     ]);
@@ -65,6 +70,23 @@ export class TransferenciasService {
           localDestinoId: dto.localDestinoId,
           referenciaId: transferencia.id,
           usuarioId,
+        },
+      });
+
+      await this.eventos.registrar(tx, {
+        tipo: TIPO_EVENTO.TRANSFERENCIA_ENVIADA,
+        agregado: 'Transferencia',
+        agregadoId: transferencia.id,
+        payload: {
+          transferenciaId: transferencia.id,
+          loteId: dto.loteId,
+          produtoNome: lote!.produto.nome,
+          quantidade: dto.quantidade,
+          localOrigemId: dto.localOrigemId,
+          localOrigemNome: localOrigem!.nome,
+          localDestinoId: dto.localDestinoId,
+          localDestinoNome: localDestino!.nome,
+          natureza: dto.natureza ?? 'INTERNA',
         },
       });
 
@@ -126,6 +148,21 @@ export class TransferenciasService {
           localDestinoId: transferencia.localDestinoId,
           referenciaId: transferencia.id,
           usuarioId: usuario.sub,
+        },
+      });
+
+      await this.eventos.registrar(tx, {
+        tipo: TIPO_EVENTO.TRANSFERENCIA_CONFIRMADA,
+        agregado: 'Transferencia',
+        agregadoId: transferencia.id,
+        payload: {
+          transferenciaId: transferencia.id,
+          loteId: transferencia.loteId,
+          status,
+          quantidadeEnviada: Number(transferencia.quantidade),
+          quantidadeConfirmada: dto.quantidadeConfirmada,
+          localOrigemId: transferencia.localOrigemId,
+          localDestinoId: transferencia.localDestinoId,
         },
       });
     });

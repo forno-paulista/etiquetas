@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { StatusAjustePendente, StatusAjusteExterno, TipoLocal, TipoMovimentoLote } from '@prisma/client';
 import type { JwtPayload } from '../auth/jwt-payload.js';
 import { localIdsPermitidos } from '../common/local-scope.util.js';
+import { EventosDominioService } from '../eventos-dominio/eventos-dominio.service.js';
+import { TIPO_EVENTO } from '../eventos-dominio/tipos.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateDescarteDto } from './dto/create-descarte.dto.js';
 import type { FindDescartesQueryDto } from './dto/find-descartes-query.dto.js';
@@ -16,7 +18,10 @@ const descarteComRelacoesInclude = {
 
 @Injectable()
 export class DescarteService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventos: EventosDominioService,
+  ) {}
 
   async registrar(dto: CreateDescarteDto, usuarioId: string) {
     const local = await this.prisma.local.findUnique({ where: { id: dto.localId } });
@@ -31,6 +36,7 @@ export class DescarteService {
 
     const saldo = await this.prisma.saldoLote.findUnique({
       where: { loteId_localId: { loteId: dto.loteId, localId: dto.localId } },
+      include: { lote: { include: { produto: true } } },
     });
     if (!saldo || Number(saldo.quantidadeAtual) < dto.quantidade) {
       throw new BadRequestException(`Saldo insuficiente do lote em ${local.nome} para descartar ${dto.quantidade}.`);
@@ -82,6 +88,28 @@ export class DescarteService {
           },
         });
       }
+
+      // Regra de negócio da §14 do CLAUDE.md ("VarejoFacilStockProvider
+      // chamado automaticamente a cada descarte no CD") nasce daqui: um
+      // adaptador futuro escuta este evento, não precisa este service
+      // saber que ele existe.
+      await this.eventos.registrar(tx, {
+        tipo: TIPO_EVENTO.DESCARTE_REGISTRADO,
+        agregado: 'Descarte',
+        agregadoId: descarte.id,
+        payload: {
+          descarteId: descarte.id,
+          loteId: dto.loteId,
+          produtoNome: saldo.lote.produto.nome,
+          quantidade: dto.quantidade,
+          motivoId: dto.motivoId,
+          motivoNome: motivo.nome,
+          localId: dto.localId,
+          localNome: local.nome,
+          localTipo: local.tipo,
+          statusAjusteExterno: statusInicial,
+        },
+      });
 
       return descarte.id;
     });

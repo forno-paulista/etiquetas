@@ -503,6 +503,53 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
 
 ---
 
+## 19. Eventos de Domínio (Outbox)
+
+Pedido do usuário (2026-09-28): "arquitetura preparada para integrações
+futuras usando eventos de domínio... adaptadores externos consumam esses
+eventos sem modificar o núcleo." Isso é o mesmo objetivo da seção 8
+(`StockProvider`), mas resolvido no sentido inverso — `StockProvider` é o
+sistema chamando pra fora (nós escrevemos no Varejo Fácil); eventos de
+domínio são o sistema publicando o que aconteceu, pra quem quiser escutar
+de fora (um adaptador futuro lendo, sem nós sabermos quem é).
+
+- **Padrão: transactional outbox.** Tabela `EventoDominio` (`id`
+  autoincrement, `tipo`, `agregado`, `agregadoId`, `payload` JSON,
+  `ocorridoEm`). Todo service de domínio que muda estado relevante
+  (`lotes`, `producao`, `transferencias`, `descarte`, `consumo`,
+  `contagem`) grava o evento **dentro da mesma `$transaction`** que grava
+  a mudança de estado — o evento nunca existe sem o estado, nem o
+  contrário (sem problema de dual-write).
+- **Tipos de evento** (`backend/src/eventos-dominio/tipos.ts`):
+  `lote.recebido`, `producao.realizada`, `transferencia.enviada`,
+  `transferencia.confirmada`, `descarte.registrado`, `consumo.registrado`,
+  `contagem.divergente` (contagem sem divergência não gera evento — não
+  houve mudança de estado, regra 6/seção 6). Mapeiam quase 1:1 pro enum
+  `TipoMovimentoLote`, exceto Transferência, que é dois eventos (envio e
+  confirmação são momentos diferentes, regra 6).
+- **Consumo é por polling com cursor**, não push/webhook — não existe
+  ainda um adaptador real pra decidir formato de entrega. `GET
+  /eventos?tipo=&agregado=&desde={ultimoId}` (só `ADMIN` por ora — é
+  infraestrutura, não tela operacional), ordenado por `id` asc, o próprio
+  `id` autoincrement já é o cursor (não precisa de sequência separada).
+  Limitado a 200 resultados por chamada, sem paginação — mesmo padrão do
+  Relatório de Movimentações (seção 11), não é prioridade no MVP ter mais
+  que isso.
+- **O que foi deliberadamente NÃO construído**, pra não antecipar decisão
+  que não é nossa: nenhum EventEmitter em processo (`@nestjs/event-emitter`
+  ou similar) — "adaptador externo" por definição roda em outro processo,
+  então um mecanismo in-process não serviria a esse requisito, e seria uma
+  dependência nova pra uma necessidade que não existe hoje. Nenhum
+  adaptador real consumindo os eventos ainda (é exatamente o
+  `VarejoFacilStockProvider`/`SaiposStockProvider` da seção 8 — quando
+  forem implementados, um deles pode ler daqui). Nenhuma autenticação
+  dedicada pra consumidor externo (hoje é JWT de usuário Admin como
+  qualquer outra rota) — fica em aberto igual a outros pontos da seção 17,
+  porque a forma de autenticar um adaptador externo depende de como ele
+  vai rodar (outro serviço com API key? processo agendado com o mesmo
+  JWT?). Nenhuma retenção/expurgo de eventos antigos — tabela cresce sem
+  limite por enquanto, revisar se algum dia importar volume.
+
 ## Estado do repositório
 
 - `backend/`: API NestJS + Prisma (schema de dados da seção 7 já modelado em `backend/prisma/schema.prisma`), com `Dockerfile` multi-stage (build → runtime) para rodar containerizado.
@@ -517,6 +564,7 @@ na etiqueta — já estava anotado, confirmado agora com dado real.
 - `backend/src/consumo/`: `POST /consumo` registra baixa manual (regra 14) — só `MovimentoLote(CONSUMO)`, não tem tabela própria.
 - `backend/src/descarte/` + `backend/src/ajustes-pendentes/`: `POST /descartes` decide `statusAjusteExterno` pelo tipo do local — CD vira `PENDENTE` (`VarejoFacilStockProvider` ainda não existe, ver seção 8), Loja vira `ENVIADO_FILA` + cria `AjustePendente`. `PATCH /ajustes-pendentes/:id/marcar-lancado` fecha o ciclo (fila da seção 11) e propaga `AJUSTADO_NO_ERP` de volta pro Descarte.
 - `backend/src/contagem/`: `POST /contagem` só gera `MovimentoLote(AJUSTE_CONTAGEM)` se a contagem divergir do saldo — e exige `observacao` (campo novo em `MovimentoLote`, não existia antes) quando diverge, regra/seção 10. Sem divergência, não cria nada.
+- `backend/src/eventos-dominio/`: outbox de eventos de domínio (seção 19) — `EventosDominioService.registrar()` chamado de dentro da `$transaction` de `lotes`/`producao`/`transferencias`/`descarte`/`consumo`/`contagem`, `GET /eventos?tipo=&agregado=&desde=` (só `ADMIN`) pra consumo por polling com cursor. Testado de ponta a ponta: Recebimento real via UI gerou `lote.recebido` (id 1), Descarte do mesmo lote gerou `descarte.registrado` (id 2), ambos com payload completo batendo com o que foi submetido.
 - `frontend/`: iniciado — Vite + React + TypeScript, Tailwind, React Router, TanStack Query. Capacitor ainda não entrou (só quando for empacotar como app nativo de verdade, seção 15 — a PWA não precisa disso pra existir).
   - `src/lib/apiClient.ts`: instância do axios com refresh automático de token no 401 (fila única de refresh, evita disparar vários em paralelo).
   - `src/context/AuthContext.tsx` + `ProtectedRoute`: sessão guardada no `localStorage` (trade-off consciente — o backend devolve os tokens no corpo, não em cookie httpOnly).

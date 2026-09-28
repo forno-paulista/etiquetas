@@ -12,6 +12,7 @@ import { RolesGuard } from './auth/guards/roles.guard.js';
 import { ConsumoModule } from './consumo/consumo.module.js';
 import { ContagemModule } from './contagem/contagem.module.js';
 import { DescarteModule } from './descarte/descarte.module.js';
+import { EventosDominioModule } from './eventos-dominio/eventos-dominio.module.js';
 import { FornecedoresModule } from './fornecedores/fornecedores.module.js';
 import { GruposModule } from './grupos/grupos.module.js';
 import { LocaisModule } from './locais/locais.module.js';
@@ -34,6 +35,7 @@ import { UsuariosModule } from './usuarios/usuarios.module.js';
     // apertado via @Throttle() na própria rota.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
     PrismaModule,
+    EventosDominioModule,
     AuthModule,
     UsuariosModule,
     LocaisModule,

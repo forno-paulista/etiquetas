@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { TipoMovimentoLote } from '@prisma/client';
 import { gerarCodigoLotePadrao } from '../common/codigo-lote.util.js';
 import { resolverDataValidade } from '../common/validade.util.js';
+import { EventosDominioService } from '../eventos-dominio/eventos-dominio.service.js';
+import { TIPO_EVENTO } from '../eventos-dominio/tipos.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateProducaoDto } from './dto/create-producao.dto.js';
 
@@ -15,7 +17,10 @@ const producaoComRelacoesInclude = {
 
 @Injectable()
 export class ProducaoService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventos: EventosDominioService,
+  ) {}
 
   async criar(dto: CreateProducaoDto, usuarioId: string) {
     this.validarConsumos(dto);
@@ -123,6 +128,28 @@ export class ProducaoService {
           });
         }
       }
+
+      await this.eventos.registrar(tx, {
+        tipo: TIPO_EVENTO.PRODUCAO_REALIZADA,
+        agregado: 'Producao',
+        agregadoId: producao.id,
+        payload: {
+          producaoId: producao.id,
+          produtoSaidaId: dto.produtoSaidaId,
+          produtoSaidaNome: produtoSaida.nome,
+          loteSaidaId: loteSaida.id,
+          quantidadeProduzida: dto.quantidadeProduzida,
+          localId: dto.localId,
+          localNome: local.nome,
+          validadeSaida,
+          consumos: dto.consumos.map((c) => ({
+            loteOrigemId: c.origemDesconhecida ? null : c.loteOrigemId,
+            origemDesconhecida: Boolean(c.origemDesconhecida),
+            descricaoOrigem: c.descricaoOrigem ?? null,
+            quantidadeConsumida: c.quantidadeConsumida,
+          })),
+        },
+      });
 
       return producao.id;
     });

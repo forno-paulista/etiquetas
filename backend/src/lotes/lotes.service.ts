@@ -4,6 +4,8 @@ import type { JwtPayload } from '../auth/jwt-payload.js';
 import { gerarCodigoLotePadrao } from '../common/codigo-lote.util.js';
 import { localIdsPermitidos } from '../common/local-scope.util.js';
 import { resolverDataValidade } from '../common/validade.util.js';
+import { EventosDominioService } from '../eventos-dominio/eventos-dominio.service.js';
+import { TIPO_EVENTO } from '../eventos-dominio/tipos.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateLoteDto } from './dto/create-lote.dto.js';
 import type { FindLotesQueryDto } from './dto/find-lotes-query.dto.js';
@@ -22,7 +24,10 @@ const loteComRelacoesInclude = {
 
 @Injectable()
 export class LotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventos: EventosDominioService,
+  ) {}
 
   async receber(dto: CreateLoteDto, usuarioId: string) {
     const produto = await this.prisma.produto.findUnique({ where: { id: dto.produtoId } });
@@ -76,6 +81,26 @@ export class LotesService {
           quantidade: dto.quantidade,
           localDestinoId: dto.localId,
           usuarioId,
+        },
+      });
+
+      await this.eventos.registrar(tx, {
+        tipo: TIPO_EVENTO.LOTE_RECEBIDO,
+        agregado: 'Lote',
+        agregadoId: lote.id,
+        payload: {
+          loteId: lote.id,
+          qrCodeId: lote.qrCodeId,
+          codigoLote: lote.codigoLote,
+          produtoId: produto.id,
+          produtoNome: produto.nome,
+          unidadeMedida: produto.unidadeMedida,
+          localId: dto.localId,
+          localNome: local.nome,
+          quantidade: dto.quantidade,
+          dataFabricacao,
+          dataValidade,
+          fornecedorId: dto.fornecedorId ?? null,
         },
       });
 
